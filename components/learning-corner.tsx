@@ -1246,17 +1246,15 @@ export function LearningCorner() {
       const endTime = new Date()
       const durationMinutes = Math.round(sessionTimer / 60)
       
-      // Only include fields that exist in the current database schema
       const sessionData = {
+        ...newSession,
         topic_id: activeSession,
-        subtopic_id: null, // Can be set if studying a specific subtopic
         user_id: user.id,
         session_date: new Date().toISOString().split('T')[0],
         start_time: sessionStartTime.toISOString(),
         end_time: endTime.toISOString(),
         duration_minutes: durationMinutes,
-        notes: sessionNotes?.trim() || null,
-        focus_rating: Math.min(Math.max(newSession.focus_rating || 5, 1), 5), // Ensure it's between 1-5
+        notes: sessionNotes,
         created_at: new Date().toISOString()
       }
 
@@ -1266,10 +1264,7 @@ export function LearningCorner() {
         .select()
         .single()
 
-      if (error) {
-        console.error("Session insert error:", error)
-        throw error
-      }
+      if (error) throw error
 
       setSessions(prev => [data, ...prev])
       
@@ -1284,7 +1279,7 @@ export function LearningCorner() {
       resetSessionState()
     } catch (error) {
       console.error("Error ending session:", error)
-      setError("Failed to save study session. Please try again.")
+      setError("Failed to save study session.")
     }
   }
 
