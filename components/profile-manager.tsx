@@ -1,4 +1,4 @@
-"use client"
+  "use client"
 
 import { useState, useEffect } from "react"
 import { GlassCard } from "@/components/glass-card"
@@ -13,8 +13,10 @@ import {
   EyeOff,
   Settings,
   Shield,
-  Database,
-  ExternalLink,
+  Clock,
+  Lock,
+  X,
+  AlertCircle,
 } from "lucide-react"
 
 interface ProfileData {
@@ -23,6 +25,10 @@ interface ProfileData {
   createdAt: string
   lastSignIn: string | null
   emailConfirmed: boolean
+  phone: string | null
+  metadata: any
+  appMetadata: any
+  identities: any[]
 }
 
 export function ProfileManager() {
@@ -31,16 +37,22 @@ export function ProfileManager() {
   const [error, setError] = useState<string | null>(null)
   const [showPassword, setShowPassword] = useState(false)
   const [copiedField, setCopiedField] = useState<string | null>(null)
-  const [supabaseCredentials, setSupabaseCredentials] = useState({
-    url: "",
-    anonKey: "",
+  const [userSession, setUserSession] = useState<any>(null)
+  const [showPasswordModal, setShowPasswordModal] = useState(false)
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
   })
+  const [passwordLoading, setPasswordLoading] = useState(false)
+  const [passwordError, setPasswordError] = useState<string | null>(null)
+  const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null)
 
   const supabase = createClient()
 
   useEffect(() => {
     fetchProfileData()
-    fetchSupabaseCredentials()
+    fetchUserSession()
   }, [])
 
   const fetchProfileData = async () => {
@@ -57,8 +69,12 @@ export function ProfileManager() {
           email: user.email || "",
           userId: user.id,
           createdAt: user.created_at,
-          lastSignIn: user.last_sign_in_at,
+          lastSignIn: user.last_sign_in_at || null,
           emailConfirmed: !!user.email_confirmed_at,
+          phone: user.phone || null,
+          metadata: user.user_metadata,
+          appMetadata: user.app_metadata,
+          identities: user.identities || [],
         })
       }
     } catch (err) {
@@ -68,12 +84,17 @@ export function ProfileManager() {
     }
   }
 
-  const fetchSupabaseCredentials = () => {
-    // Get credentials from environment or hardcoded values
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://cxrngznfmtucthfqfnng.supabase.co"
-    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN4cm5nem5mbXR1Y3RoZnFmbm5nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwODgxNTEsImV4cCI6MjA3MDY2NDE1MX0.JbSSbeus1yw0ur38alj9DeNTi_jTKoZOSchqlcrS_Ow"
-    
-    setSupabaseCredentials({ url, anonKey })
+  const fetchUserSession = async () => {
+    try {
+      const { data: { session }, error } = await supabase.auth.getSession()
+      if (error) {
+        console.error("Error fetching session:", error)
+        return
+      }
+      setUserSession(session)
+    } catch (err) {
+      console.error("Error in fetchUserSession:", err)
+    }
   }
 
   const copyToClipboard = async (text: string, field: string) => {
@@ -84,6 +105,72 @@ export function ProfileManager() {
     } catch (err) {
       console.error("Failed to copy to clipboard:", err)
     }
+  }
+
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setPasswordLoading(true)
+    setPasswordError(null)
+    setPasswordSuccess(null)
+
+    try {
+      // Validate passwords
+      if (passwordData.newPassword !== passwordData.confirmPassword) {
+        throw new Error("New passwords do not match")
+      }
+
+      if (passwordData.newPassword.length < 6) {
+        throw new Error("New password must be at least 6 characters long")
+      }
+
+      // Update password using Supabase
+      const { error } = await supabase.auth.updateUser({
+        password: passwordData.newPassword
+      })
+
+      if (error) {
+        throw error
+      }
+
+      setPasswordSuccess("Password updated successfully!")
+      setPasswordData({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+      })
+      
+      setTimeout(() => {
+        setShowPasswordModal(false)
+        setPasswordSuccess(null)
+      }, 2000)
+
+    } catch (err: any) {
+      setPasswordError(err.message || "Failed to update password")
+    } finally {
+      setPasswordLoading(false)
+    }
+  }
+
+  const openPasswordModal = () => {
+    setShowPasswordModal(true)
+    setPasswordError(null)
+    setPasswordSuccess(null)
+    setPasswordData({
+      currentPassword: "",
+      newPassword: "",
+      confirmPassword: "",
+    })
+  }
+
+  const closePasswordModal = () => {
+    setShowPasswordModal(false)
+    setPasswordError(null)
+    setPasswordSuccess(null)
+    setPasswordData({
+      currentPassword: "",
+      newPassword: "",
+      confirmPassword: "",
+    })
   }
 
   const formatDate = (dateString: string) => {
@@ -235,39 +322,216 @@ export function ProfileManager() {
         </div>
       </GlassCard>
 
-      {/* Supabase Credentials */}
+      {/* Password Management */}
+      <GlassCard className="p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <Lock className="w-5 h-5 text-slate-600" />
+            <h3 className="text-lg font-semibold text-slate-800">Password Management</h3>
+          </div>
+          <button
+            onClick={openPasswordModal}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"
+          >
+            <Lock className="w-4 h-4" />
+            Change Password
+          </button>
+        </div>
+        
+        <div className="p-4 bg-slate-50/50 rounded-lg">
+          <div className="flex items-center gap-3">
+            <Shield className="w-5 h-5 text-slate-600" />
+            <div>
+              <p className="text-sm text-slate-500">Password Status</p>
+              <p className="font-medium text-slate-800">Password is set and secure</p>
+            </div>
+          </div>
+        </div>
+      </GlassCard>
+
+      {/* Authentication Information */}
       <GlassCard className="p-6">
         <div className="flex items-center gap-3 mb-6">
-          <Database className="w-5 h-5 text-slate-600" />
-          <h3 className="text-lg font-semibold text-slate-800">Supabase Credentials</h3>
+          <Shield className="w-5 h-5 text-slate-600" />
+          <h3 className="text-lg font-semibold text-slate-800">Authentication Details</h3>
         </div>
         
         <div className="space-y-4">
-          {/* Supabase URL */}
-          <div className="flex items-center justify-between p-4 bg-slate-50/50 rounded-lg">
-            <div className="flex items-center gap-3">
-              <ExternalLink className="w-5 h-5 text-slate-600" />
+          {/* Phone Number */}
+          {profile?.phone && (
+            <div className="flex items-center justify-between p-4 bg-slate-50/50 rounded-lg">
+              <div className="flex items-center gap-3">
+                <Mail className="w-5 h-5 text-slate-600" />
+                <div>
+                  <p className="text-sm text-slate-500">Phone Number</p>
+                  <p className="font-medium text-slate-800">{profile.phone}</p>
+                </div>
+              </div>
+              <CopyButton text={profile.phone} field="phone" label="Phone" />
+            </div>
+          )}
+
+          {/* Access Token */}
+          {userSession?.access_token && (
+            <div className="flex items-center justify-between p-4 bg-slate-50/50 rounded-lg">
+              <div className="flex items-center gap-3">
+                <Key className="w-5 h-5 text-slate-600" />
+                <div>
+                  <p className="text-sm text-slate-500">Access Token</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-mono text-sm text-slate-800 break-all">
+                      {showPassword ? userSession.access_token : "••••••••••••••••••••••••••••••••"}
+                    </p>
+                    <button
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="p-1 hover:bg-slate-200/50 rounded transition-colors"
+                    >
+                      {showPassword ? (
+                        <EyeOff className="w-4 h-4 text-slate-600" />
+                      ) : (
+                        <Eye className="w-4 h-4 text-slate-600" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <CopyButton text={userSession.access_token} field="accessToken" label="Token" />
+            </div>
+          )}
+
+          {/* Refresh Token */}
+          {userSession?.refresh_token && (
+            <div className="flex items-center justify-between p-4 bg-slate-50/50 rounded-lg">
+              <div className="flex items-center gap-3">
+                <Key className="w-5 h-5 text-slate-600" />
+                <div>
+                  <p className="text-sm text-slate-500">Refresh Token</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-mono text-sm text-slate-800 break-all">
+                      {showPassword ? userSession.refresh_token : "••••••••••••••••••••••••••••••••"}
+                    </p>
+                    <button
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="p-1 hover:bg-slate-200/50 rounded transition-colors"
+                    >
+                      {showPassword ? (
+                        <EyeOff className="w-4 h-4 text-slate-600" />
+                      ) : (
+                        <Eye className="w-4 h-4 text-slate-600" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <CopyButton text={userSession.refresh_token} field="refreshToken" label="Refresh Token" />
+            </div>
+          )}
+
+          {/* Session Expiry */}
+          {userSession?.expires_at && (
+            <div className="flex items-center gap-3 p-4 bg-slate-50/50 rounded-lg">
+              <Clock className="w-5 h-5 text-slate-600" />
               <div>
-                <p className="text-sm text-slate-500">Supabase URL</p>
-                <p className="font-mono text-sm text-slate-800 break-all">{supabaseCredentials.url}</p>
+                <p className="text-sm text-slate-500">Session Expires</p>
+                <p className="font-medium text-slate-800">
+                  {formatDate(new Date(userSession.expires_at * 1000).toISOString())}
+                </p>
               </div>
             </div>
-            <CopyButton text={supabaseCredentials.url} field="url" label="URL" />
-          </div>
+          )}
+        </div>
+      </GlassCard>
 
-          {/* Supabase Anon Key */}
-          <div className="flex items-center justify-between p-4 bg-slate-50/50 rounded-lg">
-            <div className="flex items-center gap-3">
-              <Key className="w-5 h-5 text-slate-600" />
-              <div>
-                <p className="text-sm text-slate-500">Anonymous Key</p>
-                <div className="flex items-center gap-2">
-                  <p className="font-mono text-sm text-slate-800 break-all">
-                    {showPassword ? supabaseCredentials.anonKey : "••••••••••••••••••••••••••••••••"}
+      {/* User Metadata */}
+      {(profile?.metadata && Object.keys(profile.metadata).length > 0) && (
+        <GlassCard className="p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <Settings className="w-5 h-5 text-slate-600" />
+            <h3 className="text-lg font-semibold text-slate-800">User Metadata</h3>
+          </div>
+          
+          <div className="space-y-3">
+            {Object.entries(profile.metadata).map(([key, value]) => (
+              <div key={key} className="flex items-center justify-between p-3 bg-slate-50/50 rounded-lg">
+                <div>
+                  <p className="text-sm text-slate-500 capitalize">{key.replace(/_/g, ' ')}</p>
+                  <p className="font-medium text-slate-800">
+                    {typeof value === 'object' ? JSON.stringify(value) : String(value)}
                   </p>
+                </div>
+                <CopyButton 
+                  text={typeof value === 'object' ? JSON.stringify(value) : String(value)} 
+                  field={`metadata-${key}`} 
+                  label={key} 
+                />
+              </div>
+            ))}
+          </div>
+        </GlassCard>
+      )}
+
+      {/* Authentication Providers */}
+      {profile?.identities && profile.identities.length > 0 && (
+        <GlassCard className="p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <Shield className="w-5 h-5 text-slate-600" />
+            <h3 className="text-lg font-semibold text-slate-800">Authentication Providers</h3>
+          </div>
+          
+          <div className="space-y-3">
+            {profile.identities.map((identity: any, index: number) => (
+              <div key={index} className="flex items-center justify-between p-3 bg-slate-50/50 rounded-lg">
+                <div>
+                  <p className="text-sm text-slate-500">Provider</p>
+                  <p className="font-medium text-slate-800 capitalize">{identity.provider}</p>
+                  {identity.identity_data?.email && (
+                    <p className="text-xs text-slate-600 mt-1">{identity.identity_data.email}</p>
+                  )}
+                </div>
+                <div className="text-right">
+                  <p className="text-sm text-slate-500">Created</p>
+                  <p className="text-xs text-slate-600">
+                    {formatDate(identity.created_at)}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </GlassCard>
+      )}
+
+      {/* Password Change Modal */}
+      {showPasswordModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
+            <div className="flex items-center justify-between p-6 border-b border-slate-200">
+              <h3 className="text-lg font-semibold text-slate-800">Change Password</h3>
+              <button
+                onClick={closePasswordModal}
+                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-slate-600" />
+              </button>
+            </div>
+
+            <form onSubmit={handlePasswordChange} className="p-6 space-y-4">
+              {/* Current Password */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Current Password
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={passwordData.currentPassword}
+                    onChange={(e) => setPasswordData(prev => ({ ...prev, currentPassword: e.target.value }))}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Enter current password"
+                  />
                   <button
+                    type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="p-1 hover:bg-slate-200/50 rounded transition-colors"
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 p-1 hover:bg-slate-100 rounded transition-colors"
                   >
                     {showPassword ? (
                       <EyeOff className="w-4 h-4 text-slate-600" />
@@ -277,48 +541,84 @@ export function ProfileManager() {
                   </button>
                 </div>
               </div>
-            </div>
-            <CopyButton text={supabaseCredentials.anonKey} field="anonKey" label="Key" />
-          </div>
-        </div>
-      </GlassCard>
 
-      {/* Environment Variables Info */}
-      <GlassCard className="p-6">
-        <div className="flex items-center gap-3 mb-4">
-          <Settings className="w-5 h-5 text-slate-600" />
-          <h3 className="text-lg font-semibold text-slate-800">Environment Setup</h3>
-        </div>
-        
-        <div className="bg-slate-50/50 rounded-lg p-4">
-          <p className="text-sm text-slate-600 mb-3">
-            To use these credentials in your environment, create a <code className="bg-slate-200/50 px-2 py-1 rounded text-xs">.env.local</code> file:
-          </p>
-          <div className="bg-slate-800 text-green-400 p-3 rounded-lg font-mono text-sm">
-            <div>NEXT_PUBLIC_SUPABASE_URL={supabaseCredentials.url}</div>
-            <div>NEXT_PUBLIC_SUPABASE_ANON_KEY={supabaseCredentials.anonKey}</div>
+              {/* New Password */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  New Password
+                </label>
+                <input
+                  type="password"
+                  value={passwordData.newPassword}
+                  onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Enter new password (min 6 characters)"
+                  minLength={6}
+                />
+              </div>
+
+              {/* Confirm New Password */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Confirm New Password
+                </label>
+                <input
+                  type="password"
+                  value={passwordData.confirmPassword}
+                  onChange={(e) => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Confirm new password"
+                />
+              </div>
+
+              {/* Error Message */}
+              {passwordError && (
+                <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <AlertCircle className="w-4 h-4 text-red-500" />
+                  <p className="text-sm text-red-700">{passwordError}</p>
+                </div>
+              )}
+
+              {/* Success Message */}
+              {passwordSuccess && (
+                <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <Check className="w-4 h-4 text-green-500" />
+                  <p className="text-sm text-green-700">{passwordSuccess}</p>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={closePasswordModal}
+                  className="flex-1 px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors"
+                  disabled={passwordLoading}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={passwordLoading || !passwordData.newPassword || !passwordData.confirmPassword}
+                  className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {passwordLoading ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      Updating...
+                    </>
+                  ) : (
+                    <>
+                      <Lock className="w-4 h-4" />
+                      Update Password
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
-          <button
-            onClick={() => copyToClipboard(
-              `NEXT_PUBLIC_SUPABASE_URL=${supabaseCredentials.url}\nNEXT_PUBLIC_SUPABASE_ANON_KEY=${supabaseCredentials.anonKey}`,
-              "env"
-            )}
-            className="mt-3 flex items-center gap-2 px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"
-          >
-            {copiedField === "env" ? (
-              <>
-                <Check className="w-4 h-4" />
-                <span>Copied!</span>
-              </>
-            ) : (
-              <>
-                <Copy className="w-4 h-4" />
-                <span>Copy Environment Variables</span>
-              </>
-            )}
-          </button>
         </div>
-      </GlassCard>
+      )}
     </div>
   )
 }
