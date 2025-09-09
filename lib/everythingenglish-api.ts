@@ -194,13 +194,65 @@ export async function getLearningProgressAnalytics(): Promise<LearningProgressAn
     
     if (error) {
       console.error('Error fetching learning progress analytics:', error)
-      throw new Error(`Failed to fetch learning progress analytics: ${error.message}`)
+      // Return default values if there's an error
+      return {
+        study_streaks: {
+          total_users_with_streaks: 0,
+          avg_current_streak: 0,
+          max_current_streak: 0,
+          avg_longest_streak: 0,
+          total_study_days: 0
+        },
+        study_goals: {
+          total_goals: 0,
+          completed_goals: 0,
+          active_goals: 0,
+          completion_rate: 0
+        },
+        saved_resources: {
+          total_saved_resources: 0,
+          unique_users_saving: 0,
+          avg_resources_per_user: 0,
+          most_popular_category: null
+        },
+        user_engagement_levels: {
+          highly_engaged: 0,
+          moderately_engaged: 0,
+          low_engagement: 0
+        }
+      }
     }
     
     return data
   } catch (error) {
     console.error('Error in getLearningProgressAnalytics:', error)
-    throw error
+    // Return default values on any error
+    return {
+      study_streaks: {
+        total_users_with_streaks: 0,
+        avg_current_streak: 0,
+        max_current_streak: 0,
+        avg_longest_streak: 0,
+        total_study_days: 0
+      },
+      study_goals: {
+        total_goals: 0,
+        completed_goals: 0,
+        active_goals: 0,
+        completion_rate: 0
+      },
+      saved_resources: {
+        total_saved_resources: 0,
+        unique_users_saving: 0,
+        avg_resources_per_user: 0,
+        most_popular_category: null
+      },
+      user_engagement_levels: {
+        highly_engaged: 0,
+        moderately_engaged: 0,
+        low_engagement: 0
+      }
+    }
   }
 }
 
@@ -210,13 +262,59 @@ export async function getPerformanceInsights(): Promise<PerformanceInsights> {
     
     if (error) {
       console.error('Error fetching performance insights:', error)
-      throw new Error(`Failed to fetch performance insights: ${error.message}`)
+      // Return default values if there's an error
+      return {
+        subscription_analytics: {
+          total_subscribers: 0,
+          free_users: 0,
+          launch_users: 0,
+          conversion_rate: 0
+        },
+        content_performance: {
+          most_popular_question_types: [],
+          academic_level_distribution: []
+        },
+        growth_indicators: {
+          new_users_last_7_days: 0,
+          new_users_last_30_days: 0,
+          active_users_last_7_days: 0,
+          retention_rate_7d: 0
+        },
+        feedback_quality: {
+          total_feedback_responses: 0,
+          positive_feedback_rate: 0,
+          feedback_categories: []
+        }
+      }
     }
     
     return data
   } catch (error) {
     console.error('Error in getPerformanceInsights:', error)
-    throw error
+    // Return default values on any error
+    return {
+      subscription_analytics: {
+        total_subscribers: 0,
+        free_users: 0,
+        launch_users: 0,
+        conversion_rate: 0
+      },
+      content_performance: {
+        most_popular_question_types: [],
+        academic_level_distribution: []
+      },
+      growth_indicators: {
+        new_users_last_7_days: 0,
+        new_users_last_30_days: 0,
+        active_users_last_7_days: 0,
+        retention_rate_7d: 0
+      },
+      feedback_quality: {
+        total_feedback_responses: 0,
+        positive_feedback_rate: 0,
+        feedback_categories: []
+      }
+    }
   }
 }
 
