@@ -13,7 +13,7 @@ import { LearningCorner } from "@/components/learning-corner"
 import { QuickNotes } from "@/components/quick-notes"
 import { CalendarView } from "@/components/calendar-view"
 import { WritingStudio } from "@/components/writing-studio"
-import { MarketingDashboard } from "@/components/marketing-dashboard"
+import { EnhancedMarketingDashboard } from "@/components/enhanced-marketing-dashboard"
 import {
   Brain,
   CheckSquare,
@@ -84,7 +84,7 @@ export default function JoshApp() {
           {activeTab === "notes" && <QuickNotes />}
           {activeTab === "calendar" && <CalendarView />}
           {activeTab === "writing" && <WritingStudio />}
-          {activeTab === "marketing" && <MarketingDashboard />}
+          {activeTab === "marketing" && <EnhancedMarketingDashboard />}
         </main>
       </div>
 

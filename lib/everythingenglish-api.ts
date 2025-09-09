@@ -35,9 +35,103 @@ export interface UserActivityAnalytics {
   email_confirmation_rate: number
 }
 
+export interface AssessmentAnalytics {
+  total_evaluations: number
+  total_assessment_users: number
+  active_assessment_users: number
+  recent_evaluations: number
+  daily_evaluations: Array<{
+    date: string
+    count: number
+    unique_users: number
+  }>
+  question_type_breakdown: Array<{
+    question_type: string
+    count: number
+    unique_users: number
+  }>
+  academic_level_breakdown: Array<{
+    academic_level: string
+    user_count: number
+    avg_questions_marked: number
+    active_subscribers: number
+  }>
+  engagement_metrics: {
+    avg_evaluations_per_user: number
+    most_active_user_evaluations: number
+    users_with_multiple_evaluations: number
+  }
+}
+
+export interface LearningProgressAnalytics {
+  study_streaks: {
+    total_users_with_streaks: number
+    avg_current_streak: number
+    max_current_streak: number
+    avg_longest_streak: number
+    total_study_days: number
+  }
+  study_goals: {
+    total_goals: number
+    completed_goals: number
+    active_goals: number
+    completion_rate: number
+  }
+  saved_resources: {
+    total_saved_resources: number
+    unique_users_saving: number
+    avg_resources_per_user: number
+    most_popular_category: string | null
+  }
+  user_engagement_levels: {
+    highly_engaged: number
+    moderately_engaged: number
+    low_engagement: number
+  }
+}
+
+export interface PerformanceInsights {
+  subscription_analytics: {
+    total_subscribers: number
+    free_users: number
+    launch_users: number
+    conversion_rate: number
+  }
+  content_performance: {
+    most_popular_question_types: Array<{
+      question_type: string
+      evaluation_count: number
+      unique_users: number
+    }>
+    academic_level_distribution: Array<{
+      level: string
+      user_count: number
+      percentage: number
+    }>
+  }
+  growth_indicators: {
+    new_users_last_7_days: number
+    new_users_last_30_days: number
+    active_users_last_7_days: number
+    retention_rate_7d: number
+  }
+  feedback_quality: {
+    total_feedback_responses: number
+    positive_feedback_rate: number
+    feedback_categories: Array<{
+      category: string
+      count: number
+      accuracy_rate: number
+    }>
+  }
+}
+
 export interface MarketingMetrics {
   signupAnalytics: SignupAnalytics
   activityAnalytics: UserActivityAnalytics
+  assessmentAnalytics: AssessmentAnalytics
+  learningProgressAnalytics: LearningProgressAnalytics
+  performanceInsights: PerformanceInsights
   lastUpdated: string
 }
 
@@ -76,16 +170,72 @@ export async function getUserActivityAnalytics(): Promise<UserActivityAnalytics>
   }
 }
 
+export async function getAssessmentAnalytics(daysBack: number = 30): Promise<AssessmentAnalytics> {
+  try {
+    const { data, error } = await everythingEnglishClient.rpc('get_assessment_analytics', {
+      days_back: daysBack
+    })
+    
+    if (error) {
+      console.error('Error fetching assessment analytics:', error)
+      throw new Error(`Failed to fetch assessment analytics: ${error.message}`)
+    }
+    
+    return data
+  } catch (error) {
+    console.error('Error in getAssessmentAnalytics:', error)
+    throw error
+  }
+}
+
+export async function getLearningProgressAnalytics(): Promise<LearningProgressAnalytics> {
+  try {
+    const { data, error } = await everythingEnglishClient.rpc('get_learning_progress_analytics')
+    
+    if (error) {
+      console.error('Error fetching learning progress analytics:', error)
+      throw new Error(`Failed to fetch learning progress analytics: ${error.message}`)
+    }
+    
+    return data
+  } catch (error) {
+    console.error('Error in getLearningProgressAnalytics:', error)
+    throw error
+  }
+}
+
+export async function getPerformanceInsights(): Promise<PerformanceInsights> {
+  try {
+    const { data, error } = await everythingEnglishClient.rpc('get_performance_insights')
+    
+    if (error) {
+      console.error('Error fetching performance insights:', error)
+      throw new Error(`Failed to fetch performance insights: ${error.message}`)
+    }
+    
+    return data
+  } catch (error) {
+    console.error('Error in getPerformanceInsights:', error)
+    throw error
+  }
+}
+
 export async function getAllMarketingMetrics(daysBack: number = 30): Promise<MarketingMetrics> {
   try {
-    const [signupAnalytics, activityAnalytics] = await Promise.all([
+    const [signupAnalytics, activityAnalytics, assessmentAnalytics, learningProgressAnalytics, performanceInsights] = await Promise.all([
       getSignupAnalytics(daysBack),
-      getUserActivityAnalytics()
+      getUserActivityAnalytics(),
+      getAssessmentAnalytics(daysBack),
+      getLearningProgressAnalytics(),
+      getPerformanceInsights()
     ])
     
     return {
       signupAnalytics,
       activityAnalytics,
+      assessmentAnalytics,
+      learningProgressAnalytics,
+      performanceInsights,
       lastUpdated: new Date().toISOString()
     }
   } catch (error) {
