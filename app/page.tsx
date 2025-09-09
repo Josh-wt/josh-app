@@ -13,6 +13,7 @@ import { LearningCorner } from "@/components/learning-corner"
 import { QuickNotes } from "@/components/quick-notes"
 import { CalendarView } from "@/components/calendar-view"
 import { WritingStudio } from "@/components/writing-studio"
+import { MarketingDashboard } from "@/components/marketing-dashboard"
 import {
   Brain,
   CheckSquare,
@@ -24,6 +25,7 @@ import {
   Calendar,
   Zap,
   PenTool,
+  BarChart3,
 } from "lucide-react"
 
 const tabs = [
@@ -37,6 +39,7 @@ const tabs = [
   { id: "notes", label: "Notes", icon: StickyNote },
   { id: "calendar", label: "Calendar", icon: Calendar },
   { id: "writing", label: "Writing", icon: PenTool },
+  { id: "marketing", label: "Marketing", icon: BarChart3 },
 ]
 
 export default function JoshApp() {
@@ -81,6 +84,7 @@ export default function JoshApp() {
           {activeTab === "notes" && <QuickNotes />}
           {activeTab === "calendar" && <CalendarView />}
           {activeTab === "writing" && <WritingStudio />}
+          {activeTab === "marketing" && <MarketingDashboard />}
         </main>
       </div>
 
