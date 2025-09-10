@@ -589,8 +589,14 @@ export function SuperNotes() {
 
       {/* Full Screen Expanded Note */}
       {expandedNote && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4">
-          <div className="bg-white rounded-xl sm:rounded-2xl shadow-2xl w-full max-w-4xl max-h-[95vh] sm:max-h-[90vh] overflow-hidden">
+        <div 
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9999] flex items-center justify-center p-2 sm:p-4"
+          onClick={() => setExpandedNote(null)}
+        >
+          <div 
+            className="bg-white rounded-xl sm:rounded-2xl shadow-2xl w-full max-w-4xl max-h-[95vh] sm:max-h-[90vh] overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
             {(() => {
               const note = superNotes.find(n => n.id === expandedNote)
               if (!note) return null
@@ -743,21 +749,21 @@ export function SuperNotes() {
       {/* Super Notes Display */}
       {filteredNotes.length > 0 && (
         <div>
-          <h3 className="font-semibold text-slate-800 mb-4">Your Super Notes</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <h3 className="font-semibold text-slate-800 mb-4 text-sm sm:text-base">Your Super Notes</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             {filteredNotes.map((note) => (
               <GlassCard 
                 key={note.id} 
-                className="p-6 hover:scale-[1.02] transition-all cursor-pointer group"
-                onClick={() => setExpandedNote(note.id)}
+                className="p-4 sm:p-6 hover:scale-[1.02] transition-all cursor-pointer group"
               >
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex-1">
-                    <h4 className="font-semibold text-slate-800 mb-2 group-hover:text-purple-600 transition-colors">
+                <div onClick={() => setExpandedNote(note.id)} className="h-full">
+                <div className="flex items-start justify-between mb-3 sm:mb-4">
+                  <div className="flex-1 min-w-0">
+                    <h4 className="font-semibold text-slate-800 mb-2 group-hover:text-purple-600 transition-colors text-sm sm:text-base break-words">
                       {note.title}
                     </h4>
-                    <p className="text-sm text-slate-600 mb-3 line-clamp-3">{note.content}</p>
-                    <div className="flex flex-wrap gap-1 mb-4">
+                    <p className="text-xs sm:text-sm text-slate-600 mb-3 line-clamp-3">{note.content}</p>
+                    <div className="flex flex-wrap gap-1 mb-3 sm:mb-4">
                       {note.tags.slice(0, 3).map((tag) => (
                         <span key={tag} className="px-2 py-1 bg-purple-100/50 rounded-full text-xs text-purple-700">
                           #{tag}
@@ -792,7 +798,7 @@ export function SuperNotes() {
                               e.stopPropagation()
                               copyToClipboard(subNote.hidden_text, subNote.id)
                             }}
-                            className="flex-1 text-left text-sm font-medium text-slate-700 hover:text-purple-600 transition-colors truncate"
+                            className="flex-1 text-left text-xs sm:text-sm font-medium text-slate-700 hover:text-purple-600 transition-colors truncate"
                             title="Click to copy hidden text"
                           >
                             {subNote.title}
@@ -815,6 +821,7 @@ export function SuperNotes() {
                   <div className="text-xs text-slate-500 text-center">
                     Click to open full view
                   </div>
+                </div>
                 </div>
               </GlassCard>
             ))}
