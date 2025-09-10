@@ -84,24 +84,19 @@ class RealGoogleAnalyticsAPI {
     if (cached) return cached;
 
     try {
-      // Call the actual MCP tool for real-time data
-      const response = await mcp_analytics-mcp_run_realtime_report({
-        property_id: this.propertyId,
-        dimensions: [
-          { name: "country" },
-          { name: "deviceCategory" }
-        ],
-        metrics: [
-          { name: "activeUsers" }
-        ]
-      });
+      // Call the API route for real-time data
+      const response = await fetch(`/api/analytics/realtime?propertyId=${this.propertyId}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
 
-      const activeUsers = response.result.rows?.reduce((sum: number, row: any) => sum + parseInt(row.metric_values[0].value), 0) || 0;
+      const activeUsers = data.result.rows?.reduce((sum: number, row: any) => sum + parseInt(row.metric_values[0].value), 0) || 0;
 
       const activeUsersByCountry: Array<{ country: string; activeUsers: number }> = [];
       const activeUsersByDevice: Array<{ deviceCategory: string; activeUsers: number }> = [];
 
-      response.result.rows?.forEach((row: any) => {
+      data.result.rows?.forEach((row: any) => {
         const country = row.dimension_values[0]?.value || '(not set)';
         const deviceCategory = row.dimension_values[1]?.value || '(not set)';
         const users = parseInt(row.metric_values[0].value);
@@ -139,7 +134,12 @@ class RealGoogleAnalyticsAPI {
       return realtimeData;
     } catch (error) {
       console.error('Error fetching real-time data:', error);
-      throw new Error('Failed to fetch real-time data');
+      console.error('Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        propertyId: this.propertyId
+      });
+      throw new Error(`Failed to fetch real-time data: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -150,23 +150,14 @@ class RealGoogleAnalyticsAPI {
     if (cached) return cached;
 
     try {
-      const dateRanges = this.generateDateRanges(days);
-      
-      // Call the actual MCP tool for standard metrics
-      const response = await mcp_analytics-mcp_run_report({
-        property_id: this.propertyId,
-        date_ranges: dateRanges,
-        metrics: [
-          { name: "sessions" },
-          { name: "totalUsers" },
-          { name: "newUsers" },
-          { name: "screenPageViews" },
-          { name: "bounceRate" },
-          { name: "averageSessionDuration" }
-        ]
-      });
+      // Call the API route for standard metrics
+      const response = await fetch(`/api/analytics/standard?propertyId=${this.propertyId}&days=${days}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
 
-      const row = response.result.rows?.[0]?.metric_values;
+      const row = data.result.rows?.[0]?.metric_values;
       if (!row) throw new Error("No data found for standard metrics.");
 
       const sessions = parseInt(row[0].value);
@@ -195,7 +186,13 @@ class RealGoogleAnalyticsAPI {
       return metrics;
     } catch (error) {
       console.error('Error fetching standard metrics:', error);
-      throw new Error('Failed to fetch standard metrics');
+      console.error('Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        propertyId: this.propertyId,
+        days
+      });
+      throw new Error(`Failed to fetch standard metrics: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -206,24 +203,14 @@ class RealGoogleAnalyticsAPI {
     if (cached) return cached;
 
     try {
-      const dateRanges = this.generateDateRanges(days);
-      
-      // Call the actual MCP tool for geographic metrics
-      const response = await mcp_analytics-mcp_run_report({
-        property_id: this.propertyId,
-        date_ranges: dateRanges,
-        dimensions: [{ name: "country" }],
-        metrics: [
-          { name: "sessions" },
-          { name: "totalUsers" },
-          { name: "newUsers" },
-          { name: "screenPageViews" },
-          { name: "bounceRate" },
-          { name: "averageSessionDuration" }
-        ]
-      });
+      // Call the API route for geographic metrics
+      const response = await fetch(`/api/analytics/geographic?propertyId=${this.propertyId}&days=${days}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
 
-      const metrics: GeographicMetrics[] = response.result.rows?.map((row: any) => ({
+      const metrics: GeographicMetrics[] = data.result.rows?.map((row: any) => ({
         country: row.dimension_values[0]?.value || '(not set)',
         sessions: parseInt(row.metric_values[0].value),
         totalUsers: parseInt(row.metric_values[1].value),
@@ -237,7 +224,13 @@ class RealGoogleAnalyticsAPI {
       return metrics;
     } catch (error) {
       console.error('Error fetching geographic metrics:', error);
-      throw new Error('Failed to fetch geographic metrics');
+      console.error('Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        propertyId: this.propertyId,
+        days
+      });
+      throw new Error(`Failed to fetch geographic metrics: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -248,23 +241,14 @@ class RealGoogleAnalyticsAPI {
     if (cached) return cached;
 
     try {
-      const dateRanges = this.generateDateRanges(days);
-      
-      // Call the actual MCP tool for device metrics
-      const response = await mcp_analytics-mcp_run_report({
-        property_id: this.propertyId,
-        date_ranges: dateRanges,
-        dimensions: [{ name: "deviceCategory" }],
-        metrics: [
-          { name: "sessions" },
-          { name: "totalUsers" },
-          { name: "screenPageViews" },
-          { name: "bounceRate" },
-          { name: "averageSessionDuration" }
-        ]
-      });
+      // Call the API route for device metrics
+      const response = await fetch(`/api/analytics/device?propertyId=${this.propertyId}&days=${days}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
 
-      const metrics: DeviceMetrics[] = response.result.rows?.map((row: any) => ({
+      const metrics: DeviceMetrics[] = data.result.rows?.map((row: any) => ({
         deviceCategory: row.dimension_values[0]?.value || '(not set)',
         sessions: parseInt(row.metric_values[0].value),
         totalUsers: parseInt(row.metric_values[1].value),
@@ -277,7 +261,13 @@ class RealGoogleAnalyticsAPI {
       return metrics;
     } catch (error) {
       console.error('Error fetching device metrics:', error);
-      throw new Error('Failed to fetch device metrics');
+      console.error('Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        propertyId: this.propertyId,
+        days
+      });
+      throw new Error(`Failed to fetch device metrics: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
