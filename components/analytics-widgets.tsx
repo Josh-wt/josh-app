@@ -12,6 +12,13 @@ import {
   type DeviceData,
   type PageData
 } from "@/lib/analytics-service"
+import { 
+  googleAnalyticsAPI, 
+  type RealtimeData as GARealtimeData,
+  type StandardMetrics,
+  type GeographicMetrics,
+  type DeviceMetrics
+} from "@/lib/google-analytics-api"
 import {
   Users,
   Eye,
@@ -821,13 +828,378 @@ export function AnalyticsOverview({ data, loading = false, onRefresh }: Analytic
   );
 }
 
-// Export all components
-export {
-  MetricCard,
-  RealTimeWidget,
-  TrafficSourcesWidget,
-  GeographicWidget,
-  DeviceWidget,
-  TopPagesWidget,
-  AnalyticsOverview
-};
+// Real-time Google Analytics Widget using actual API data
+interface RealTimeGoogleAnalyticsWidgetProps {
+  loading?: boolean;
+}
+
+export function RealTimeGoogleAnalyticsWidget({ loading = false }: RealTimeGoogleAnalyticsWidgetProps) {
+  const [data, setData] = useState<GARealtimeData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        const realtimeData = await googleAnalyticsAPI.getRealtimeData();
+        setData(realtimeData);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to fetch real-time data');
+        console.error('Error fetching real-time data:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+    
+    // Refresh every 30 seconds
+    const interval = setInterval(fetchData, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  if (loading || isLoading) {
+    return (
+      <GlassCard className="p-6">
+        <div className="animate-pulse">
+          <div className="h-6 bg-slate-200 rounded w-1/3 mb-4"></div>
+          <div className="h-16 bg-slate-200 rounded mb-4"></div>
+          <div className="grid grid-cols-2 gap-4">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="h-12 bg-slate-200 rounded"></div>
+            ))}
+          </div>
+        </div>
+      </GlassCard>
+    );
+  }
+
+  if (error) {
+    return (
+      <GlassCard className="p-6">
+        <div className="flex items-center space-x-3 text-red-500">
+          <AlertCircle className="w-6 h-6" />
+          <div>
+            <h3 className="text-lg font-semibold">Real-Time Data Error</h3>
+            <p className="text-sm">{error}</p>
+          </div>
+        </div>
+      </GlassCard>
+    );
+  }
+
+  if (!data) {
+    return (
+      <GlassCard className="p-6">
+        <div className="text-center text-slate-500">
+          <Activity className="w-12 h-12 mx-auto mb-4" />
+          <p>No real-time data available</p>
+        </div>
+      </GlassCard>
+    );
+  }
+
+  return (
+    <GlassCard className="p-6">
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center space-x-3">
+          <Activity className="w-6 h-6 text-green-500" />
+          <h3 className="text-lg font-semibold text-slate-800">Real-Time Activity</h3>
+        </div>
+        <div className="flex items-center space-x-2">
+          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+          <span className="text-sm text-slate-500">Live</span>
+        </div>
+      </div>
+
+      <div className="text-center mb-6">
+        <div className="text-4xl font-bold text-slate-800 mb-2">
+          {data.activeUsers}
+        </div>
+        <p className="text-sm text-slate-600">Active Users Right Now</p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-3">
+          <h4 className="text-sm font-medium text-slate-600">By Country</h4>
+          {data.activeUsersByCountry.map((country, index) => (
+            <div key={country.country} className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <div 
+                  className="w-3 h-3 rounded-full" 
+                  style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                ></div>
+                <span className="text-sm text-slate-700">{country.country}</span>
+              </div>
+              <span className="text-sm font-semibold text-slate-800">
+                {country.activeUsers}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        <div className="space-y-3">
+          <h4 className="text-sm font-medium text-slate-600">By Device</h4>
+          {data.activeUsersByDevice.map((device, index) => (
+            <div key={device.deviceCategory} className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                {device.deviceCategory === 'desktop' && <Monitor className="w-4 h-4 text-slate-500" />}
+                {device.deviceCategory === 'mobile' && <Smartphone className="w-4 h-4 text-slate-500" />}
+                {device.deviceCategory === 'tablet' && <Tablet className="w-4 h-4 text-slate-500" />}
+                <span className="text-sm text-slate-700 capitalize">{device.deviceCategory}</span>
+              </div>
+              <span className="text-sm font-semibold text-slate-800">
+                {device.activeUsers}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </GlassCard>
+  );
+}
+
+// Geographic Widget using real Google Analytics data
+interface GeographicGoogleAnalyticsWidgetProps {
+  loading?: boolean;
+  days?: number;
+}
+
+export function GeographicGoogleAnalyticsWidget({ loading = false, days = 7 }: GeographicGoogleAnalyticsWidgetProps) {
+  const [data, setData] = useState<GeographicMetrics[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        const geographicData = await googleAnalyticsAPI.getGeographicMetrics(days);
+        setData(geographicData);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to fetch geographic data');
+        console.error('Error fetching geographic data:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [days]);
+
+  if (loading || isLoading) {
+    return (
+      <GlassCard className="p-6">
+        <div className="animate-pulse">
+          <div className="h-6 bg-slate-200 rounded w-1/3 mb-6"></div>
+          <div className="space-y-4">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="h-12 bg-slate-200 rounded"></div>
+            ))}
+          </div>
+        </div>
+      </GlassCard>
+    );
+  }
+
+  if (error) {
+    return (
+      <GlassCard className="p-6">
+        <div className="flex items-center space-x-3 text-red-500">
+          <AlertCircle className="w-6 h-6" />
+          <div>
+            <h3 className="text-lg font-semibold">Geographic Data Error</h3>
+            <p className="text-sm">{error}</p>
+          </div>
+        </div>
+      </GlassCard>
+    );
+  }
+
+  return (
+    <GlassCard className="p-6">
+      <div className="flex items-center space-x-3 mb-6">
+        <MapPin className="w-6 h-6 text-green-500" />
+        <h3 className="text-lg font-semibold text-slate-800">Geographic Distribution (Last 7 Days)</h3>
+      </div>
+
+      <div className="space-y-4">
+        {data.slice(0, 10).map((location, index) => (
+          <div key={location.country} className="glass-panel p-4 rounded-lg">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center space-x-3">
+                <div 
+                  className="w-3 h-3 rounded-full" 
+                  style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                ></div>
+                <div>
+                  <p className="font-semibold text-slate-800">{location.country}</p>
+                  <p className="text-sm text-slate-500">{googleAnalyticsAPI.formatNumber(location.totalUsers)} users</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="font-semibold text-slate-800">
+                  {googleAnalyticsAPI.formatNumber(location.sessions)}
+                </p>
+                <p className="text-sm text-slate-500">sessions</p>
+              </div>
+            </div>
+            <div className="w-full bg-slate-200 rounded-full h-2">
+              <div 
+                className="h-2 rounded-full transition-all duration-300"
+                style={{ 
+                  width: `${(location.sessions / Math.max(...data.map(d => d.sessions))) * 100}%`,
+                  backgroundColor: COLORS[index % COLORS.length]
+                }}
+              ></div>
+            </div>
+            <div className="grid grid-cols-3 gap-4 text-xs text-slate-600 mt-2">
+              <div>
+                <span className="block">Bounce Rate</span>
+                <span className="font-semibold">{googleAnalyticsAPI.formatPercentage(location.bounceRate)}</span>
+              </div>
+              <div>
+                <span className="block">Avg Duration</span>
+                <span className="font-semibold">{googleAnalyticsAPI.formatDuration(location.averageSessionDuration)}</span>
+              </div>
+              <div>
+                <span className="block">Page Views</span>
+                <span className="font-semibold">{googleAnalyticsAPI.formatNumber(location.screenPageViews)}</span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </GlassCard>
+  );
+}
+
+// Device Widget using real Google Analytics data
+interface DeviceGoogleAnalyticsWidgetProps {
+  loading?: boolean;
+  days?: number;
+}
+
+export function DeviceGoogleAnalyticsWidget({ loading = false, days = 7 }: DeviceGoogleAnalyticsWidgetProps) {
+  const [data, setData] = useState<DeviceMetrics[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        const deviceData = await googleAnalyticsAPI.getDeviceMetrics(days);
+        setData(deviceData);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to fetch device data');
+        console.error('Error fetching device data:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [days]);
+
+  if (loading || isLoading) {
+    return (
+      <GlassCard className="p-6">
+        <div className="animate-pulse">
+          <div className="h-6 bg-slate-200 rounded w-1/3 mb-6"></div>
+          <div className="h-48 bg-slate-200 rounded"></div>
+        </div>
+      </GlassCard>
+    );
+  }
+
+  if (error) {
+    return (
+      <GlassCard className="p-6">
+        <div className="flex items-center space-x-3 text-red-500">
+          <AlertCircle className="w-6 h-6" />
+          <div>
+            <h3 className="text-lg font-semibold">Device Data Error</h3>
+            <p className="text-sm">{error}</p>
+          </div>
+        </div>
+      </GlassCard>
+    );
+  }
+
+  const totalSessions = data.reduce((sum, device) => sum + device.sessions, 0);
+
+  return (
+    <GlassCard className="p-6">
+      <div className="flex items-center space-x-3 mb-6">
+        <Smartphone className="w-6 h-6 text-purple-500" />
+        <h3 className="text-lg font-semibold text-slate-800">Device Categories (Last 7 Days)</h3>
+      </div>
+
+      <div className="space-y-4">
+        {data.map((device, index) => {
+          const percentage = (device.sessions / totalSessions) * 100;
+          const Icon = device.deviceCategory === 'desktop' ? Monitor : 
+                      device.deviceCategory === 'mobile' ? Smartphone : Tablet;
+          
+          return (
+            <div key={device.deviceCategory} className="glass-panel p-4 rounded-lg">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center space-x-3">
+                  <Icon className="w-6 h-6 text-slate-600" />
+                  <div>
+                    <p className="font-semibold text-slate-800 capitalize">{device.deviceCategory}</p>
+                    <p className="text-sm text-slate-500">{percentage.toFixed(1)}% of sessions</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-2xl font-bold text-slate-800">
+                    {googleAnalyticsAPI.formatNumber(device.sessions)}
+                  </p>
+                  <p className="text-sm text-slate-500">sessions</p>
+                </div>
+              </div>
+              
+              <div className="w-full bg-slate-200 rounded-full h-3 mb-3">
+                <div 
+                  className="h-3 rounded-full transition-all duration-300"
+                  style={{ 
+                    width: `${percentage}%`,
+                    backgroundColor: COLORS[index % COLORS.length]
+                  }}
+                ></div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4 text-sm">
+                <div>
+                  <span className="text-slate-600">Users</span>
+                  <p className="font-semibold text-slate-800">
+                    {googleAnalyticsAPI.formatNumber(device.totalUsers)}
+                  </p>
+                </div>
+                <div>
+                  <span className="text-slate-600">Bounce Rate</span>
+                  <p className="font-semibold text-slate-800">
+                    {googleAnalyticsAPI.formatPercentage(device.bounceRate)}
+                  </p>
+                </div>
+                <div>
+                  <span className="text-slate-600">Avg Duration</span>
+                  <p className="font-semibold text-slate-800">
+                    {googleAnalyticsAPI.formatDuration(device.averageSessionDuration)}
+                  </p>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </GlassCard>
+  );
+}
+
+// All components are already exported above
