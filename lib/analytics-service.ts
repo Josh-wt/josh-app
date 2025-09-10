@@ -264,20 +264,21 @@ class AnalyticsService {
   // Get core metrics
   async getMetrics(dateRanges: DateRange[]): Promise<AnalyticsMetrics> {
     try {
-      // Mock data - in real implementation, this would call the MCP tool
+      // For now, return realistic mock data based on typical education website metrics
+      // In a production environment, this would call the actual Google Analytics MCP tools
       const metrics: AnalyticsMetrics = {
-        sessions: Math.floor(Math.random() * 10000) + 5000,
-        users: Math.floor(Math.random() * 8000) + 4000,
-        newUsers: Math.floor(Math.random() * 3000) + 1500,
-        pageviews: Math.floor(Math.random() * 50000) + 25000,
-        uniquePageviews: Math.floor(Math.random() * 30000) + 15000,
-        bounceRate: Math.random() * 0.4 + 0.3, // 30-70%
-        avgSessionDuration: Math.random() * 300 + 120, // 2-7 minutes
-        pagesPerSession: Math.random() * 3 + 2, // 2-5 pages
-        conversionRate: Math.random() * 0.05 + 0.02, // 2-7%
-        goalCompletions: Math.floor(Math.random() * 500) + 100,
-        revenue: Math.random() * 10000 + 5000, // $5k-$15k
-        ecommerceConversionRate: Math.random() * 0.03 + 0.01 // 1-4%
+        sessions: 1247,
+        users: 892,
+        newUsers: 456,
+        pageviews: 3842,
+        uniquePageviews: 3201,
+        bounceRate: 0.42, // 42%
+        avgSessionDuration: 187, // 3 minutes 7 seconds
+        pagesPerSession: 3.1,
+        conversionRate: 0.035, // 3.5%
+        goalCompletions: 44,
+        revenue: 0, // No ecommerce for education site
+        ecommerceConversionRate: 0
       };
 
       return metrics;
@@ -294,47 +295,65 @@ class AnalyticsService {
         {
           source: "google",
           medium: "organic",
-          sessions: Math.floor(Math.random() * 3000) + 2000,
-          users: Math.floor(Math.random() * 2500) + 1500,
-          pageviews: Math.floor(Math.random() * 15000) + 10000,
-          bounceRate: Math.random() * 0.3 + 0.2,
-          avgSessionDuration: Math.random() * 200 + 150
-        },
-        {
-          source: "facebook",
-          medium: "social",
-          sessions: Math.floor(Math.random() * 1500) + 800,
-          users: Math.floor(Math.random() * 1200) + 600,
-          pageviews: Math.floor(Math.random() * 8000) + 4000,
-          bounceRate: Math.random() * 0.4 + 0.3,
-          avgSessionDuration: Math.random() * 180 + 120
-        },
-        {
-          source: "youtube",
-          medium: "social",
-          sessions: Math.floor(Math.random() * 1000) + 500,
-          users: Math.floor(Math.random() * 800) + 400,
-          pageviews: Math.floor(Math.random() * 6000) + 3000,
-          bounceRate: Math.random() * 0.5 + 0.2,
-          avgSessionDuration: Math.random() * 300 + 200
+          sessions: 523,
+          users: 387,
+          pageviews: 1847,
+          bounceRate: 0.38,
+          avgSessionDuration: 195
         },
         {
           source: "direct",
           medium: "(none)",
-          sessions: Math.floor(Math.random() * 2000) + 1000,
-          users: Math.floor(Math.random() * 1500) + 800,
-          pageviews: Math.floor(Math.random() * 10000) + 5000,
-          bounceRate: Math.random() * 0.3 + 0.2,
-          avgSessionDuration: Math.random() * 250 + 180
+          sessions: 312,
+          users: 234,
+          pageviews: 987,
+          bounceRate: 0.45,
+          avgSessionDuration: 167
+        },
+        {
+          source: "facebook",
+          medium: "social",
+          sessions: 156,
+          users: 98,
+          pageviews: 423,
+          bounceRate: 0.52,
+          avgSessionDuration: 142
+        },
+        {
+          source: "youtube",
+          medium: "social",
+          sessions: 89,
+          users: 67,
+          pageviews: 234,
+          bounceRate: 0.48,
+          avgSessionDuration: 156
         },
         {
           source: "bing",
           medium: "organic",
-          sessions: Math.floor(Math.random() * 800) + 300,
-          users: Math.floor(Math.random() * 600) + 250,
-          pageviews: Math.floor(Math.random() * 4000) + 2000,
-          bounceRate: Math.random() * 0.4 + 0.25,
-          avgSessionDuration: Math.random() * 220 + 140
+          sessions: 67,
+          users: 45,
+          pageviews: 189,
+          bounceRate: 0.41,
+          avgSessionDuration: 178
+        },
+        {
+          source: "linkedin",
+          medium: "social",
+          sessions: 45,
+          users: 32,
+          pageviews: 98,
+          bounceRate: 0.44,
+          avgSessionDuration: 134
+        },
+        {
+          source: "twitter",
+          medium: "social",
+          sessions: 34,
+          users: 28,
+          pageviews: 67,
+          bounceRate: 0.56,
+          avgSessionDuration: 123
         }
       ];
 
@@ -349,21 +368,19 @@ class AnalyticsService {
   async getGeographicData(dateRanges: DateRange[]): Promise<GeographicData[]> {
     try {
       const countries = [
-        { country: "United States", city: "New York", sessions: 2500, users: 2000 },
-        { country: "United Kingdom", city: "London", sessions: 1800, users: 1500 },
-        { country: "Canada", city: "Toronto", sessions: 1200, users: 1000 },
-        { country: "Australia", city: "Sydney", sessions: 900, users: 750 },
-        { country: "India", city: "Mumbai", sessions: 800, users: 650 },
-        { country: "Germany", city: "Berlin", sessions: 700, users: 580 },
-        { country: "France", city: "Paris", sessions: 600, users: 500 },
-        { country: "Japan", city: "Tokyo", sessions: 500, users: 420 }
+        { country: "United States", city: "New York", sessions: 456, users: 342 },
+        { country: "United Kingdom", city: "London", sessions: 234, users: 187 },
+        { country: "Canada", city: "Toronto", sessions: 156, users: 123 },
+        { country: "Australia", city: "Sydney", sessions: 98, users: 78 },
+        { country: "India", city: "Mumbai", sessions: 87, users: 65 },
+        { country: "Germany", city: "Berlin", sessions: 67, users: 52 },
+        { country: "France", city: "Paris", sessions: 54, users: 41 },
+        { country: "Japan", city: "Tokyo", sessions: 45, users: 34 },
+        { country: "Netherlands", city: "Amsterdam", sessions: 34, users: 28 },
+        { country: "Sweden", city: "Stockholm", sessions: 28, users: 22 }
       ];
 
-      return countries.map(country => ({
-        ...country,
-        sessions: country.sessions + Math.floor(Math.random() * 500) - 250,
-        users: country.users + Math.floor(Math.random() * 300) - 150
-      }));
+      return countries;
     } catch (error) {
       console.error('Error fetching geographic data:', error);
       throw new Error('Failed to fetch geographic data');
@@ -376,21 +393,21 @@ class AnalyticsService {
       const devices: DeviceData[] = [
         {
           deviceCategory: "desktop",
-          sessions: Math.floor(Math.random() * 4000) + 3000,
-          users: Math.floor(Math.random() * 3200) + 2400,
-          bounceRate: Math.random() * 0.3 + 0.2
+          sessions: 678,
+          users: 512,
+          bounceRate: 0.35
         },
         {
           deviceCategory: "mobile",
-          sessions: Math.floor(Math.random() * 5000) + 4000,
-          users: Math.floor(Math.random() * 4000) + 3200,
-          bounceRate: Math.random() * 0.4 + 0.3
+          sessions: 456,
+          users: 298,
+          bounceRate: 0.52
         },
         {
           deviceCategory: "tablet",
-          sessions: Math.floor(Math.random() * 1000) + 500,
-          users: Math.floor(Math.random() * 800) + 400,
-          bounceRate: Math.random() * 0.35 + 0.25
+          sessions: 113,
+          users: 82,
+          bounceRate: 0.41
         }
       ];
 
@@ -408,42 +425,58 @@ class AnalyticsService {
         {
           pagePath: "/",
           pageTitle: "EverythingEnglish - AI-Powered English Learning",
-          pageviews: Math.floor(Math.random() * 8000) + 5000,
-          uniquePageviews: Math.floor(Math.random() * 6000) + 4000,
-          avgTimeOnPage: Math.random() * 300 + 180,
-          bounceRate: Math.random() * 0.4 + 0.2
+          pageviews: 1247,
+          uniquePageviews: 892,
+          avgTimeOnPage: 187,
+          bounceRate: 0.42
         },
         {
           pagePath: "/assessment",
           pageTitle: "English Assessment - Test Your Skills",
-          pageviews: Math.floor(Math.random() * 5000) + 3000,
-          uniquePageviews: Math.floor(Math.random() * 4000) + 2500,
-          avgTimeOnPage: Math.random() * 600 + 300,
-          bounceRate: Math.random() * 0.3 + 0.1
+          pageviews: 678,
+          uniquePageviews: 456,
+          avgTimeOnPage: 324,
+          bounceRate: 0.28
         },
         {
           pagePath: "/learning",
           pageTitle: "Learning Center - Study Materials",
-          pageviews: Math.floor(Math.random() * 3000) + 2000,
-          uniquePageviews: Math.floor(Math.random() * 2500) + 1500,
-          avgTimeOnPage: Math.random() * 400 + 200,
-          bounceRate: Math.random() * 0.35 + 0.15
+          pageviews: 456,
+          uniquePageviews: 298,
+          avgTimeOnPage: 267,
+          bounceRate: 0.35
         },
         {
           pagePath: "/about",
           pageTitle: "About EverythingEnglish",
-          pageviews: Math.floor(Math.random() * 2000) + 1000,
-          uniquePageviews: Math.floor(Math.random() * 1500) + 800,
-          avgTimeOnPage: Math.random() * 200 + 120,
-          bounceRate: Math.random() * 0.5 + 0.2
+          pageviews: 234,
+          uniquePageviews: 187,
+          avgTimeOnPage: 145,
+          bounceRate: 0.52
         },
         {
           pagePath: "/contact",
           pageTitle: "Contact Us - Get in Touch",
-          pageviews: Math.floor(Math.random() * 1500) + 800,
-          uniquePageviews: Math.floor(Math.random() * 1200) + 600,
-          avgTimeOnPage: Math.random() * 180 + 100,
-          bounceRate: Math.random() * 0.4 + 0.25
+          pageviews: 156,
+          uniquePageviews: 123,
+          avgTimeOnPage: 134,
+          bounceRate: 0.48
+        },
+        {
+          pagePath: "/pricing",
+          pageTitle: "Pricing Plans - Choose Your Plan",
+          pageviews: 98,
+          uniquePageviews: 78,
+          avgTimeOnPage: 198,
+          bounceRate: 0.41
+        },
+        {
+          pagePath: "/blog",
+          pageTitle: "English Learning Blog",
+          pageviews: 87,
+          uniquePageviews: 65,
+          avgTimeOnPage: 156,
+          bounceRate: 0.38
         }
       ];
 
@@ -458,28 +491,31 @@ class AnalyticsService {
   async getRealTimeData(): Promise<RealTimeData> {
     try {
       const realTimeData: RealTimeData = {
-        activeUsers: Math.floor(Math.random() * 50) + 20,
+        activeUsers: 23,
         activeUsersByCountry: [
-          { country: "United States", activeUsers: Math.floor(Math.random() * 20) + 10 },
-          { country: "United Kingdom", activeUsers: Math.floor(Math.random() * 15) + 5 },
-          { country: "Canada", activeUsers: Math.floor(Math.random() * 10) + 3 },
-          { country: "Australia", activeUsers: Math.floor(Math.random() * 8) + 2 }
+          { country: "United States", activeUsers: 12 },
+          { country: "United Kingdom", activeUsers: 5 },
+          { country: "Canada", activeUsers: 3 },
+          { country: "Australia", activeUsers: 2 },
+          { country: "Germany", activeUsers: 1 }
         ],
         activeUsersByDevice: [
-          { deviceCategory: "desktop", activeUsers: Math.floor(Math.random() * 25) + 10 },
-          { deviceCategory: "mobile", activeUsers: Math.floor(Math.random() * 30) + 15 },
-          { deviceCategory: "tablet", activeUsers: Math.floor(Math.random() * 8) + 2 }
+          { deviceCategory: "desktop", activeUsers: 14 },
+          { deviceCategory: "mobile", activeUsers: 7 },
+          { deviceCategory: "tablet", activeUsers: 2 }
         ],
         activeUsersBySource: [
-          { source: "google", activeUsers: Math.floor(Math.random() * 20) + 8 },
-          { source: "direct", activeUsers: Math.floor(Math.random() * 15) + 5 },
-          { source: "facebook", activeUsers: Math.floor(Math.random() * 10) + 3 },
-          { source: "youtube", activeUsers: Math.floor(Math.random() * 8) + 2 }
+          { source: "google", activeUsers: 12 },
+          { source: "direct", activeUsers: 6 },
+          { source: "facebook", activeUsers: 3 },
+          { source: "youtube", activeUsers: 2 }
         ],
         topPages: [
-          { pagePath: "/", pageTitle: "Home", activeUsers: Math.floor(Math.random() * 15) + 5 },
-          { pagePath: "/assessment", pageTitle: "Assessment", activeUsers: Math.floor(Math.random() * 12) + 3 },
-          { pagePath: "/learning", pageTitle: "Learning", activeUsers: Math.floor(Math.random() * 10) + 2 }
+          { pagePath: "/", pageTitle: "EverythingEnglish - AI-Powered English Learning", activeUsers: 8 },
+          { pagePath: "/assessment", pageTitle: "English Assessment - Test Your Skills", activeUsers: 6 },
+          { pagePath: "/learning", pageTitle: "Learning Center - Study Materials", activeUsers: 4 },
+          { pagePath: "/about", pageTitle: "About EverythingEnglish", activeUsers: 3 },
+          { pagePath: "/contact", pageTitle: "Contact Us - Get in Touch", activeUsers: 2 }
         ]
       };
 
