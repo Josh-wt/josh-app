@@ -939,8 +939,8 @@ export function HabitTracker() {
                   "bg-gradient-to-br from-white/90 to-slate-50/90 backdrop-blur-xl border border-white/30",
                   isCompletedToday && "ring-2 ring-emerald-500/30 bg-gradient-to-br from-emerald-50/90 to-green-50/90",
                 )}
-                onClick={() => setSelectedHabit(selectedHabit === habit.id ? null : habit.id)}
               >
+                <div onClick={() => setSelectedHabit(selectedHabit === habit.id ? null : habit.id)} className="h-full">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-start gap-4 flex-1">
                     <button
@@ -1190,6 +1190,7 @@ export function HabitTracker() {
                     )}
                   </div>
                 )}
+                </div>
               </GlassCard>
             )
           })}

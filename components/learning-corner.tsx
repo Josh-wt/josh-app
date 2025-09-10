@@ -37,7 +37,7 @@ import {
   Zap,
   Award,
   Globe,
-  BookMarkCheck,
+  BookmarkCheck,
   GraduationCap,
   Lightbulb,
   Timer,
@@ -2826,7 +2826,7 @@ Props and state management [Advanced] [120min]"
         <GlassCard className="p-6">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-xl font-semibold text-slate-800 flex items-center gap-2">
-              <CalendarFullIcon className="w-6 h-6" />
+              <Calendar className="w-6 h-6" />
               Study Calendar
             </h3>
             <div className="flex items-center gap-3">

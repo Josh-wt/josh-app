@@ -16,7 +16,7 @@ import {
   Compass, Camera, Mic, Tag, Flag, Heart, MessageSquare, GitBranch,
   History, FileDown, FilePlus, FolderOpen, X, MoreHorizontal,
   Layers, Scissors, Clipboard, Undo, Redo, AlignCenter, AlignRight,
-  AlignJustify, Indent, Outdent, Strikethrough, Subscript, Superscript
+  AlignJustify, Indent, Outdent, Strikethrough, Subscript, Superscript, Square
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -555,8 +555,8 @@ export function WritingStudio() {
 
   // Refs
   const editorRef = useRef<HTMLTextAreaElement>(null)
-  const autoSaveTimeoutRef = useRef<NodeJS.Timeout>()
-  const sessionIntervalRef = useRef<NodeJS.Timeout>()
+  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const sessionIntervalRef = useRef<NodeJS.Timeout | null>(null)
   
   // Supabase
   const supabase = createClient()
