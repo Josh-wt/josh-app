@@ -16,6 +16,7 @@ import {
   Edit3,
   Calendar,
   ArrowUpDown,
+  X,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
@@ -1092,7 +1093,7 @@ export function FinanceWatch() {
                 <div className="flex items-center justify-between mb-4">
                   <h4 className="font-medium text-slate-800">Edit Investment</h4>
                   <button onClick={() => setEditingInvestment(null)} className="text-slate-500 hover:text-slate-700">
-                    ✕
+                    <X className="w-4 h-4" />
                   </button>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
