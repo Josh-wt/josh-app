@@ -25,7 +25,8 @@ import {
   Target as TargetIcon,
   Megaphone,
   TrendingUp,
-  Settings
+  Settings,
+  X
 } from "lucide-react"
 
 interface NavItem {
