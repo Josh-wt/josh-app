@@ -161,11 +161,11 @@ export function DashboardGrid() {
 
   if (loading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
         {[...Array(6)].map((_, i) => (
-          <GlassCard key={i} className="p-6 animate-pulse">
-            <div className="h-4 bg-slate-200 rounded mb-4"></div>
-            <div className="h-8 bg-slate-200 rounded"></div>
+          <GlassCard key={i} className="p-4 sm:p-6 animate-pulse">
+            <div className="h-3 sm:h-4 bg-slate-200 rounded mb-3 sm:mb-4"></div>
+            <div className="h-6 sm:h-8 bg-slate-200 rounded"></div>
           </GlassCard>
         ))}
       </div>
@@ -182,12 +182,12 @@ export function DashboardGrid() {
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
       {/* Today's Focus */}
-      <GlassCard className="p-6" hover>
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold text-slate-800">Today's Focus</h3>
-          <Zap className="w-5 h-5 text-cyan-500" />
+      <GlassCard className="p-4 sm:p-6" hover>
+        <div className="flex items-center justify-between mb-3 sm:mb-4">
+          <h3 className="font-semibold text-slate-800 text-sm sm:text-base">Today's Focus</h3>
+          <Zap className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-500" />
         </div>
         <div className="space-y-3">
           <div className="flex justify-between text-sm">

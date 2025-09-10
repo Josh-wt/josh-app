@@ -360,15 +360,15 @@ export function SuperNotes() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <GlassCard className="p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-gradient-to-r from-purple-400/20 to-pink-400/20 rounded-full flex items-center justify-center">
-              <StickyNote className="w-6 h-6 text-purple-500" />
+      <GlassCard className="p-4 sm:p-6">
+        <div className="flex items-center justify-between mb-4 sm:mb-6">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-r from-purple-400/20 to-pink-400/20 rounded-full flex items-center justify-center">
+              <StickyNote className="w-5 h-5 sm:w-6 sm:h-6 text-purple-500" />
             </div>
             <div>
-              <h2 className="text-xl font-semibold text-slate-800">Super Notes</h2>
-              <p className="text-sm text-slate-600">Notes with clickable sub-notes for instant copying</p>
+              <h2 className="text-lg sm:text-xl font-semibold text-slate-800">Super Notes</h2>
+              <p className="text-xs sm:text-sm text-slate-600 hidden sm:block">Notes with clickable sub-notes for instant copying</p>
             </div>
           </div>
           <button
@@ -381,28 +381,28 @@ export function SuperNotes() {
                 setShowAddNote(true)
               }
             }}
-            className="glass-button p-3 rounded-xl hover:scale-105 transition-all"
+            className="glass-button p-2 sm:p-3 rounded-xl hover:scale-105 transition-all"
           >
-            <Plus className="w-5 h-5 text-slate-600" />
+            <Plus className="w-4 h-4 sm:w-5 sm:h-5 text-slate-600" />
           </button>
         </div>
 
         {/* Search & Filters */}
-        <div className="space-y-4">
-          <div className="flex items-center gap-4">
-            <div className="flex-1 flex items-center gap-2 glass-button px-4 py-2 rounded-lg">
+        <div className="space-y-3 sm:space-y-4">
+          <div className="flex items-center gap-2 sm:gap-4">
+            <div className="flex-1 flex items-center gap-2 glass-button px-3 sm:px-4 py-2 rounded-lg">
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search super notes..."
-                className="flex-1 bg-transparent border-none outline-none text-slate-800 placeholder-slate-500"
+                className="flex-1 bg-transparent border-none outline-none text-slate-800 placeholder-slate-500 text-sm sm:text-base"
               />
             </div>
           </div>
 
           {/* Tag Filters */}
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-1 sm:gap-2">
             {commonTags.map((tag) => (
               <button
                 key={tag}
@@ -410,7 +410,7 @@ export function SuperNotes() {
                   setSelectedTags((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]))
                 }
                 className={cn(
-                  "px-3 py-1 rounded-full text-sm transition-all",
+                  "px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm transition-all",
                   selectedTags.includes(tag)
                     ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white"
                     : "glass-button hover:scale-105",
@@ -423,37 +423,37 @@ export function SuperNotes() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
-          <div className="glass-button p-4 rounded-lg text-center">
-            <div className="text-2xl font-bold text-slate-800 mb-1">{superNotes.length}</div>
-            <div className="text-sm text-slate-600">Super Notes</div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4 mt-4 sm:mt-6">
+          <div className="glass-button p-3 sm:p-4 rounded-lg text-center">
+            <div className="text-lg sm:text-2xl font-bold text-slate-800 mb-1">{superNotes.length}</div>
+            <div className="text-xs sm:text-sm text-slate-600">Super Notes</div>
           </div>
-          <div className="glass-button p-4 rounded-lg text-center">
-            <div className="text-2xl font-bold text-slate-800 mb-1">
+          <div className="glass-button p-3 sm:p-4 rounded-lg text-center">
+            <div className="text-lg sm:text-2xl font-bold text-slate-800 mb-1">
               {superNotes.reduce((sum, note) => sum + (note.sub_notes?.length || 0), 0)}
             </div>
-            <div className="text-sm text-slate-600">Sub-Notes</div>
+            <div className="text-xs sm:text-sm text-slate-600">Sub-Notes</div>
           </div>
-          <div className="glass-button p-4 rounded-lg text-center">
-            <div className="text-2xl font-bold text-slate-800 mb-1">
+          <div className="glass-button p-3 sm:p-4 rounded-lg text-center">
+            <div className="text-lg sm:text-2xl font-bold text-slate-800 mb-1">
               {superNotes.reduce((sum, note) => sum + note.tags.length, 0)}
             </div>
-            <div className="text-sm text-slate-600">Tags</div>
+            <div className="text-xs sm:text-sm text-slate-600">Tags</div>
           </div>
-          <div className="glass-button p-4 rounded-lg text-center">
-            <div className="text-2xl font-bold text-slate-800 mb-1">
+          <div className="glass-button p-3 sm:p-4 rounded-lg text-center">
+            <div className="text-lg sm:text-2xl font-bold text-slate-800 mb-1">
               {superNotes.reduce((sum, note) => sum + note.content.split(/\s+/).filter((word) => word.length > 0).length, 0)}
             </div>
-            <div className="text-sm text-slate-600">Words</div>
+            <div className="text-xs sm:text-sm text-slate-600">Words</div>
           </div>
         </div>
       </GlassCard>
 
       {/* Add/Edit Super Note */}
       {showAddNote && (
-        <GlassCard className="p-6">
+        <GlassCard className="p-4 sm:p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-slate-800">
+            <h3 className="font-semibold text-slate-800 text-sm sm:text-base">
               {editingNote ? "Edit Super Note" : "Create New Super Note"}
             </h3>
           </div>
@@ -461,38 +461,38 @@ export function SuperNotes() {
           <div className="space-y-4">
             {/* Title */}
             <div>
-              <label className="text-sm font-medium text-slate-700 mb-2 block">Title</label>
+              <label className="text-xs sm:text-sm font-medium text-slate-700 mb-2 block">Title</label>
               <input
                 type="text"
                 value={newNote.title}
                 onChange={(e) => setNewNote((prev) => ({ ...prev, title: e.target.value }))}
                 placeholder="Enter super note title..."
-                className="w-full glass-button p-3 rounded-lg bg-transparent border-none outline-none text-slate-800 placeholder-slate-500"
+                className="w-full glass-button p-3 rounded-lg bg-transparent border-none outline-none text-slate-800 placeholder-slate-500 text-sm sm:text-base"
               />
             </div>
 
             {/* Content */}
             <div>
-              <label className="text-sm font-medium text-slate-700 mb-2 block">Content</label>
+              <label className="text-xs sm:text-sm font-medium text-slate-700 mb-2 block">Content</label>
               <textarea
                 value={newNote.content}
                 onChange={(e) => setNewNote((prev) => ({ ...prev, content: e.target.value }))}
                 placeholder="Write your super note content here..."
-                className="w-full glass-button p-3 rounded-lg bg-transparent border-none outline-none resize-none text-slate-800 placeholder-slate-500"
-                rows={6}
+                className="w-full glass-button p-3 rounded-lg bg-transparent border-none outline-none resize-none text-slate-800 placeholder-slate-500 text-sm sm:text-base"
+                rows={4}
               />
             </div>
 
             {/* Tags */}
             <div>
-              <label className="text-sm font-medium text-slate-700 mb-3 block">Tags</label>
-              <div className="flex flex-wrap gap-2">
+              <label className="text-xs sm:text-sm font-medium text-slate-700 mb-3 block">Tags</label>
+              <div className="flex flex-wrap gap-1 sm:gap-2">
                 {commonTags.map((tag) => (
                   <button
                     key={tag}
                     onClick={() => toggleTag(tag)}
                     className={cn(
-                      "px-3 py-1 rounded-full text-sm transition-all",
+                      "px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm transition-all",
                       newNote.tags.includes(tag)
                         ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white"
                         : "glass-button hover:scale-105",
@@ -505,17 +505,17 @@ export function SuperNotes() {
             </div>
 
             {/* Action Buttons */}
-            <div className="flex items-center gap-3 pt-4">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-4">
               <button
                 onClick={editingNote ? updateSuperNote : addSuperNote}
-                className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-2 rounded-xl hover:scale-105 transition-all font-medium"
+                className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-4 sm:px-6 py-2 sm:py-2 rounded-xl hover:scale-105 transition-all font-medium text-sm sm:text-base"
               >
                 {editingNote ? "Update Super Note" : "Save Super Note"}
               </button>
 
               <button
                 onClick={closeModal}
-                className="glass-button px-4 py-2 rounded-lg hover:scale-105 transition-all text-slate-600"
+                className="glass-button px-4 sm:px-4 py-2 sm:py-2 rounded-lg hover:scale-105 transition-all text-slate-600 text-sm sm:text-base"
               >
                 Cancel
               </button>
@@ -589,8 +589,8 @@ export function SuperNotes() {
 
       {/* Full Screen Expanded Note */}
       {expandedNote && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4">
+          <div className="bg-white rounded-xl sm:rounded-2xl shadow-2xl w-full max-w-4xl max-h-[95vh] sm:max-h-[90vh] overflow-hidden">
             {(() => {
               const note = superNotes.find(n => n.id === expandedNote)
               if (!note) return null
@@ -598,112 +598,112 @@ export function SuperNotes() {
               return (
                 <div className="h-full flex flex-col">
                   {/* Header */}
-                  <div className="flex items-center justify-between p-6 border-b border-slate-200">
-                    <div className="flex-1">
-                      <h2 className="text-2xl font-bold text-slate-800 mb-2">{note.title}</h2>
-                      <div className="flex flex-wrap gap-2">
+                  <div className="flex items-start justify-between p-4 sm:p-6 border-b border-slate-200">
+                    <div className="flex-1 min-w-0">
+                      <h2 className="text-lg sm:text-2xl font-bold text-slate-800 mb-2 break-words">{note.title}</h2>
+                      <div className="flex flex-wrap gap-1 sm:gap-2">
                         {note.tags.map((tag) => (
-                          <span key={tag} className="px-3 py-1 bg-purple-100 rounded-full text-sm text-purple-700">
+                          <span key={tag} className="px-2 sm:px-3 py-1 bg-purple-100 rounded-full text-xs sm:text-sm text-purple-700">
                             #{tag}
                           </span>
                         ))}
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1 sm:gap-3 ml-2">
                       <button
                         onClick={() => {
                           setSelectedNoteId(note.id)
                           setShowSubNoteForm(true)
                         }}
-                        className="glass-button p-3 rounded-lg hover:scale-105 transition-all"
+                        className="glass-button p-2 sm:p-3 rounded-lg hover:scale-105 transition-all"
                         title="Add Sub-Note"
                       >
-                        <Plus className="w-5 h-5 text-purple-500" />
+                        <Plus className="w-4 h-4 sm:w-5 sm:h-5 text-purple-500" />
                       </button>
                       <button
                         onClick={() => startEditing(note)}
-                        className="glass-button p-3 rounded-lg hover:scale-105 transition-all"
+                        className="glass-button p-2 sm:p-3 rounded-lg hover:scale-105 transition-all"
                         title="Edit Super Note"
                       >
-                        <Edit3 className="w-5 h-5 text-blue-500" />
+                        <Edit3 className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500" />
                       </button>
                       <button
                         onClick={() => {
                           setExpandedNote(null)
                           deleteSuperNote(note.id)
                         }}
-                        className="glass-button p-3 rounded-lg hover:scale-105 transition-all"
+                        className="glass-button p-2 sm:p-3 rounded-lg hover:scale-105 transition-all"
                         title="Delete Super Note"
                       >
-                        <Trash2 className="w-5 h-5 text-red-500" />
+                        <Trash2 className="w-4 h-4 sm:w-5 sm:h-5 text-red-500" />
                       </button>
                       <button
                         onClick={() => setExpandedNote(null)}
-                        className="glass-button p-3 rounded-lg hover:scale-105 transition-all"
+                        className="glass-button p-2 sm:p-3 rounded-lg hover:scale-105 transition-all"
                         title="Close"
                       >
-                        ×
+                        <span className="text-lg sm:text-xl">×</span>
                       </button>
                     </div>
                   </div>
 
                   {/* Content */}
-                  <div className="flex-1 overflow-y-auto p-6">
+                  <div className="flex-1 overflow-y-auto p-4 sm:p-6">
                     {/* Main Note Content */}
-                    <div className="mb-8">
-                      <h3 className="text-lg font-semibold text-slate-700 mb-3">Main Note</h3>
-                      <div className="p-4 bg-slate-50 rounded-lg">
-                        <p className="text-slate-700 whitespace-pre-wrap">{note.content}</p>
+                    <div className="mb-6 sm:mb-8">
+                      <h3 className="text-base sm:text-lg font-semibold text-slate-700 mb-3">Main Note</h3>
+                      <div className="p-3 sm:p-4 bg-slate-50 rounded-lg">
+                        <p className="text-sm sm:text-base text-slate-700 whitespace-pre-wrap">{note.content}</p>
                       </div>
                     </div>
 
                     {/* Sub-Notes */}
                     {note.sub_notes && note.sub_notes.length > 0 && (
                       <div>
-                        <h3 className="text-lg font-semibold text-slate-700 mb-4">Sub-Notes</h3>
-                        <div className="space-y-4">
+                        <h3 className="text-base sm:text-lg font-semibold text-slate-700 mb-4">Sub-Notes</h3>
+                        <div className="space-y-3 sm:space-y-4">
                           {note.sub_notes.map((subNote) => (
                             <div key={subNote.id} className="border border-slate-200 rounded-lg overflow-hidden">
-                              <div className="flex items-center justify-between p-4 bg-slate-50 border-b border-slate-200">
+                              <div className="flex items-center justify-between p-3 sm:p-4 bg-slate-50 border-b border-slate-200">
                                 <button
                                   onClick={() => copyToClipboard(subNote.hidden_text, subNote.id)}
-                                  className="flex-1 text-left font-semibold text-lg text-slate-800 hover:text-purple-600 transition-colors"
+                                  className="flex-1 text-left font-semibold text-base sm:text-lg text-slate-800 hover:text-purple-600 transition-colors break-words"
                                   title="Click to copy hidden text"
                                 >
                                   {subNote.title}
                                 </button>
-                                <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-2 sm:gap-3 ml-2">
                                   {copiedId === subNote.id ? (
-                                    <div className="flex items-center gap-2 text-green-600">
-                                      <Check className="w-5 h-5" />
-                                      <span className="text-sm font-medium">Copied!</span>
+                                    <div className="flex items-center gap-1 sm:gap-2 text-green-600">
+                                      <Check className="w-4 h-4 sm:w-5 sm:h-5" />
+                                      <span className="text-xs sm:text-sm font-medium">Copied!</span>
                                     </div>
                                   ) : (
-                                    <Copy className="w-5 h-5 text-slate-400 hover:text-purple-500 transition-colors" />
+                                    <Copy className="w-4 h-4 sm:w-5 sm:h-5 text-slate-400 hover:text-purple-500 transition-colors" />
                                   )}
                                   <button
                                     onClick={() => toggleSubNoteVisibility(subNote.id)}
-                                    className="p-2 hover:bg-slate-200 rounded transition-colors"
+                                    className="p-1 sm:p-2 hover:bg-slate-200 rounded transition-colors"
                                     title={visibleSubNotes.has(subNote.id) ? "Hide text" : "Show text"}
                                   >
                                     {visibleSubNotes.has(subNote.id) ? (
-                                      <EyeOff className="w-5 h-5 text-slate-500" />
+                                      <EyeOff className="w-4 h-4 sm:w-5 sm:h-5 text-slate-500" />
                                     ) : (
-                                      <Eye className="w-5 h-5 text-slate-500" />
+                                      <Eye className="w-4 h-4 sm:w-5 sm:h-5 text-slate-500" />
                                     )}
                                   </button>
                                   <button
                                     onClick={() => deleteSubNote(subNote.id, note.id)}
-                                    className="p-2 hover:bg-red-100 rounded transition-colors"
+                                    className="p-1 sm:p-2 hover:bg-red-100 rounded transition-colors"
                                     title="Delete Sub-Note"
                                   >
-                                    <Trash2 className="w-5 h-5 text-red-500" />
+                                    <Trash2 className="w-4 h-4 sm:w-5 sm:h-5 text-red-500" />
                                   </button>
                                 </div>
                               </div>
                               {visibleSubNotes.has(subNote.id) && (
-                                <div className="p-4 bg-white">
-                                  <div className="text-slate-700 whitespace-pre-wrap leading-relaxed">
+                                <div className="p-3 sm:p-4 bg-white">
+                                  <div className="text-sm sm:text-base text-slate-700 whitespace-pre-wrap leading-relaxed">
                                     {subNote.hidden_text}
                                   </div>
                                 </div>

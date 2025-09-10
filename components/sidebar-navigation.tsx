@@ -140,7 +140,11 @@ const navigationItems: NavItem[] = [
   }
 ]
 
-export function SidebarNavigation() {
+interface SidebarNavigationProps {
+  onClose?: () => void
+}
+
+export function SidebarNavigation({ onClose }: SidebarNavigationProps) {
   const pathname = usePathname()
   const [expandedItems, setExpandedItems] = useState<string[]>([])
 
@@ -161,14 +165,31 @@ export function SidebarNavigation() {
 
   const isExpanded = (itemId: string) => expandedItems.includes(itemId)
 
+  const handleLinkClick = () => {
+    // Close sidebar on mobile when a link is clicked
+    if (onClose) {
+      onClose()
+    }
+  }
+
   return (
     <div className="w-64 h-full bg-white/10 backdrop-blur-lg border-r border-white/20">
-      <div className="p-6">
-        <div className="flex items-center space-x-3 mb-8">
-          <div className="w-8 h-8 bg-gradient-to-r from-cyan-400 to-blue-500 rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-sm">J</span>
+      <div className="p-4 sm:p-6">
+        <div className="flex items-center justify-between mb-6 sm:mb-8">
+          <div className="flex items-center space-x-3">
+            <div className="w-8 h-8 bg-gradient-to-r from-cyan-400 to-blue-500 rounded-lg flex items-center justify-center">
+              <span className="text-white font-bold text-sm">J</span>
+            </div>
+            <h1 className="text-lg sm:text-xl font-bold text-slate-800">Josh App</h1>
           </div>
-          <h1 className="text-xl font-bold text-slate-800">Josh App</h1>
+          
+          {/* Mobile Close Button */}
+          <button
+            onClick={onClose}
+            className="lg:hidden glass-button p-2 rounded-lg hover:scale-105 transition-all"
+          >
+            <X className="w-4 h-4 text-slate-600" />
+          </button>
         </div>
 
         <nav className="space-y-2">
@@ -190,10 +211,16 @@ export function SidebarNavigation() {
                   <Link 
                     href={item.path} 
                     className="flex items-center space-x-3 flex-1"
-                    onClick={(e) => hasChildren ? e.preventDefault() : null}
+                    onClick={(e) => {
+                      if (hasChildren) {
+                        e.preventDefault()
+                      } else {
+                        handleLinkClick()
+                      }
+                    }}
                   >
-                    <item.icon className="w-5 h-5" />
-                    <span className="font-medium">{item.label}</span>
+                    <item.icon className="w-4 h-4 sm:w-5 sm:h-5" />
+                    <span className="font-medium text-sm sm:text-base">{item.label}</span>
                   </Link>
                   
                   {hasChildren && (
@@ -220,9 +247,10 @@ export function SidebarNavigation() {
                               ? 'bg-gradient-to-r from-blue-500/10 to-purple-500/10 text-blue-600 border border-blue-200/30' 
                               : 'hover:bg-white/5 text-slate-600'
                           }`}
+                          onClick={handleLinkClick}
                         >
-                          <child.icon className="w-4 h-4" />
-                          <span className="text-sm">{child.label}</span>
+                          <child.icon className="w-3 h-3 sm:w-4 sm:h-4" />
+                          <span className="text-xs sm:text-sm">{child.label}</span>
                         </Link>
                       )
                     })}
