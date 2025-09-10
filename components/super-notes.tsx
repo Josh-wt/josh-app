@@ -59,6 +59,7 @@ export function SuperNotes() {
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [visibleSubNotes, setVisibleSubNotes] = useState<Set<string>>(new Set())
+  const [expandedNote, setExpandedNote] = useState<string | null>(null)
 
   const supabase = createClient()
 
@@ -586,115 +587,235 @@ export function SuperNotes() {
         </GlassCard>
       )}
 
+      {/* Full Screen Expanded Note */}
+      {expandedNote && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
+            {(() => {
+              const note = superNotes.find(n => n.id === expandedNote)
+              if (!note) return null
+              
+              return (
+                <div className="h-full flex flex-col">
+                  {/* Header */}
+                  <div className="flex items-center justify-between p-6 border-b border-slate-200">
+                    <div className="flex-1">
+                      <h2 className="text-2xl font-bold text-slate-800 mb-2">{note.title}</h2>
+                      <div className="flex flex-wrap gap-2">
+                        {note.tags.map((tag) => (
+                          <span key={tag} className="px-3 py-1 bg-purple-100 rounded-full text-sm text-purple-700">
+                            #{tag}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => {
+                          setSelectedNoteId(note.id)
+                          setShowSubNoteForm(true)
+                        }}
+                        className="glass-button p-3 rounded-lg hover:scale-105 transition-all"
+                        title="Add Sub-Note"
+                      >
+                        <Plus className="w-5 h-5 text-purple-500" />
+                      </button>
+                      <button
+                        onClick={() => startEditing(note)}
+                        className="glass-button p-3 rounded-lg hover:scale-105 transition-all"
+                        title="Edit Super Note"
+                      >
+                        <Edit3 className="w-5 h-5 text-blue-500" />
+                      </button>
+                      <button
+                        onClick={() => {
+                          setExpandedNote(null)
+                          deleteSuperNote(note.id)
+                        }}
+                        className="glass-button p-3 rounded-lg hover:scale-105 transition-all"
+                        title="Delete Super Note"
+                      >
+                        <Trash2 className="w-5 h-5 text-red-500" />
+                      </button>
+                      <button
+                        onClick={() => setExpandedNote(null)}
+                        className="glass-button p-3 rounded-lg hover:scale-105 transition-all"
+                        title="Close"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Content */}
+                  <div className="flex-1 overflow-y-auto p-6">
+                    {/* Main Note Content */}
+                    <div className="mb-8">
+                      <h3 className="text-lg font-semibold text-slate-700 mb-3">Main Note</h3>
+                      <div className="p-4 bg-slate-50 rounded-lg">
+                        <p className="text-slate-700 whitespace-pre-wrap">{note.content}</p>
+                      </div>
+                    </div>
+
+                    {/* Sub-Notes */}
+                    {note.sub_notes && note.sub_notes.length > 0 && (
+                      <div>
+                        <h3 className="text-lg font-semibold text-slate-700 mb-4">Sub-Notes</h3>
+                        <div className="space-y-4">
+                          {note.sub_notes.map((subNote) => (
+                            <div key={subNote.id} className="border border-slate-200 rounded-lg overflow-hidden">
+                              <div className="flex items-center justify-between p-4 bg-slate-50 border-b border-slate-200">
+                                <button
+                                  onClick={() => copyToClipboard(subNote.hidden_text, subNote.id)}
+                                  className="flex-1 text-left font-semibold text-lg text-slate-800 hover:text-purple-600 transition-colors"
+                                  title="Click to copy hidden text"
+                                >
+                                  {subNote.title}
+                                </button>
+                                <div className="flex items-center gap-3">
+                                  {copiedId === subNote.id ? (
+                                    <div className="flex items-center gap-2 text-green-600">
+                                      <Check className="w-5 h-5" />
+                                      <span className="text-sm font-medium">Copied!</span>
+                                    </div>
+                                  ) : (
+                                    <Copy className="w-5 h-5 text-slate-400 hover:text-purple-500 transition-colors" />
+                                  )}
+                                  <button
+                                    onClick={() => toggleSubNoteVisibility(subNote.id)}
+                                    className="p-2 hover:bg-slate-200 rounded transition-colors"
+                                    title={visibleSubNotes.has(subNote.id) ? "Hide text" : "Show text"}
+                                  >
+                                    {visibleSubNotes.has(subNote.id) ? (
+                                      <EyeOff className="w-5 h-5 text-slate-500" />
+                                    ) : (
+                                      <Eye className="w-5 h-5 text-slate-500" />
+                                    )}
+                                  </button>
+                                  <button
+                                    onClick={() => deleteSubNote(subNote.id, note.id)}
+                                    className="p-2 hover:bg-red-100 rounded transition-colors"
+                                    title="Delete Sub-Note"
+                                  >
+                                    <Trash2 className="w-5 h-5 text-red-500" />
+                                  </button>
+                                </div>
+                              </div>
+                              {visibleSubNotes.has(subNote.id) && (
+                                <div className="p-4 bg-white">
+                                  <div className="text-slate-700 whitespace-pre-wrap leading-relaxed">
+                                    {subNote.hidden_text}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {(!note.sub_notes || note.sub_notes.length === 0) && (
+                      <div className="text-center py-12">
+                        <div className="w-16 h-16 mx-auto mb-4 glass-button rounded-full flex items-center justify-center">
+                          <Plus className="w-8 h-8 text-slate-400" />
+                        </div>
+                        <h3 className="text-lg font-medium text-slate-600 mb-2">No sub-notes yet</h3>
+                        <p className="text-slate-500 mb-4">Add your first sub-note to get started</p>
+                        <button
+                          onClick={() => {
+                            setSelectedNoteId(note.id)
+                            setShowSubNoteForm(true)
+                          }}
+                          className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-3 rounded-xl hover:scale-105 transition-all font-medium"
+                        >
+                          Add Sub-Note
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            })()}
+          </div>
+        </div>
+      )}
+
       {/* Super Notes Display */}
       {filteredNotes.length > 0 && (
         <div>
           <h3 className="font-semibold text-slate-800 mb-4">Your Super Notes</h3>
-          <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredNotes.map((note) => (
-              <GlassCard key={note.id} className="p-6">
+              <GlassCard 
+                key={note.id} 
+                className="p-6 hover:scale-[1.02] transition-all cursor-pointer group"
+                onClick={() => setExpandedNote(note.id)}
+              >
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex-1">
-                    <h4 className="font-semibold text-slate-800 mb-2">{note.title}</h4>
-                    <p className="text-sm text-slate-600 mb-3">{note.content}</p>
+                    <h4 className="font-semibold text-slate-800 mb-2 group-hover:text-purple-600 transition-colors">
+                      {note.title}
+                    </h4>
+                    <p className="text-sm text-slate-600 mb-3 line-clamp-3">{note.content}</p>
                     <div className="flex flex-wrap gap-1 mb-4">
-                      {note.tags.map((tag) => (
+                      {note.tags.slice(0, 3).map((tag) => (
                         <span key={tag} className="px-2 py-1 bg-purple-100/50 rounded-full text-xs text-purple-700">
                           #{tag}
                         </span>
                       ))}
+                      {note.tags.length > 3 && (
+                        <span className="px-2 py-1 bg-slate-100/50 rounded-full text-xs text-slate-600">
+                          +{note.tags.length - 3}
+                        </span>
+                      )}
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => {
-                        setSelectedNoteId(note.id)
-                        setShowSubNoteForm(true)
-                      }}
-                      className="glass-button p-2 rounded-lg hover:scale-105 transition-all"
-                      title="Add Sub-Note"
-                    >
-                      <Plus className="w-4 h-4 text-purple-500" />
-                    </button>
-                    <button
-                      onClick={() => startEditing(note)}
-                      className="glass-button p-2 rounded-lg hover:scale-105 transition-all"
-                      title="Edit Super Note"
-                    >
-                      <Edit3 className="w-4 h-4 text-blue-500" />
-                    </button>
-                    <button
-                      onClick={() => deleteSuperNote(note.id)}
-                      className="glass-button p-2 rounded-lg hover:scale-105 transition-all"
-                      title="Delete Super Note"
-                    >
-                      <Trash2 className="w-4 h-4 text-red-500" />
-                    </button>
                   </div>
                 </div>
 
-                {/* Sub-Notes */}
+                {/* Sub-Notes Preview */}
                 {note.sub_notes && note.sub_notes.length > 0 && (
                   <div className="border-t border-slate-200 pt-4">
-                    <h5 className="text-sm font-medium text-slate-700 mb-3">Sub-Notes</h5>
+                    <div className="flex items-center justify-between mb-3">
+                      <h5 className="text-sm font-medium text-slate-700">Sub-Notes</h5>
+                      <span className="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-full">
+                        {note.sub_notes.length}
+                      </span>
+                    </div>
                     <div className="space-y-2">
-                      {note.sub_notes.map((subNote) => (
+                      {note.sub_notes.slice(0, 3).map((subNote) => (
                         <div
                           key={subNote.id}
-                          className="flex items-center gap-3 p-3 glass-button rounded-lg hover:scale-[1.01] transition-all group"
+                          className="flex items-center gap-2 p-2 glass-button rounded-lg"
                         >
-                          <GripVertical className="w-4 h-4 text-slate-400" />
                           <button
-                            onClick={() => copyToClipboard(subNote.hidden_text, subNote.id)}
-                            className="flex-1 text-left font-medium text-slate-800 hover:text-purple-600 transition-colors"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              copyToClipboard(subNote.hidden_text, subNote.id)
+                            }}
+                            className="flex-1 text-left text-sm font-medium text-slate-700 hover:text-purple-600 transition-colors truncate"
                             title="Click to copy hidden text"
                           >
                             {subNote.title}
                           </button>
-                          <div className="flex items-center gap-2">
-                            {copiedId === subNote.id ? (
-                              <Check className="w-4 h-4 text-green-500" />
-                            ) : (
-                              <Copy className="w-4 h-4 text-slate-400 group-hover:text-purple-500 transition-colors" />
-                            )}
-                            <button
-                              onClick={() => toggleSubNoteVisibility(subNote.id)}
-                              className="p-1 hover:bg-slate-100 rounded transition-colors"
-                              title={visibleSubNotes.has(subNote.id) ? "Hide text" : "Show text"}
-                            >
-                              {visibleSubNotes.has(subNote.id) ? (
-                                <EyeOff className="w-4 h-4 text-slate-500" />
-                              ) : (
-                                <Eye className="w-4 h-4 text-slate-500" />
-                              )}
-                            </button>
-                            <button
-                              onClick={() => deleteSubNote(subNote.id, note.id)}
-                              className="p-1 hover:bg-red-100 rounded transition-colors"
-                              title="Delete Sub-Note"
-                            >
-                              <Trash2 className="w-4 h-4 text-red-500" />
-                            </button>
-                          </div>
+                          {copiedId === subNote.id && (
+                            <Check className="w-4 h-4 text-green-500 flex-shrink-0" />
+                          )}
                         </div>
                       ))}
+                      {note.sub_notes.length > 3 && (
+                        <div className="text-xs text-slate-500 text-center py-1">
+                          +{note.sub_notes.length - 3} more sub-notes
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
 
-                {/* Show hidden text if visible */}
-                {note.sub_notes && note.sub_notes.length > 0 && (
-                  <div className="mt-4 space-y-2">
-                    {note.sub_notes
-                      .filter((subNote) => visibleSubNotes.has(subNote.id))
-                      .map((subNote) => (
-                        <div key={`text-${subNote.id}`} className="p-3 bg-slate-50 rounded-lg">
-                          <div className="text-xs text-slate-500 mb-1">{subNote.title}</div>
-                          <div className="text-sm text-slate-700 whitespace-pre-wrap">{subNote.hidden_text}</div>
-                        </div>
-                      ))}
+                <div className="mt-4 pt-4 border-t border-slate-200">
+                  <div className="text-xs text-slate-500 text-center">
+                    Click to open full view
                   </div>
-                )}
+                </div>
               </GlassCard>
             ))}
           </div>
