@@ -60,8 +60,19 @@ export function SuperNotes() {
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [visibleSubNotes, setVisibleSubNotes] = useState<Set<string>>(new Set())
   const [expandedNote, setExpandedNote] = useState<string | null>(null)
+  
+  // Debug function to log state changes
+  const debugSetExpandedNote = (noteId: string | null) => {
+    console.log("🔍 DEBUG: Setting expandedNote from", expandedNote, "to", noteId)
+    setExpandedNote(noteId)
+  }
 
   const supabase = createClient()
+
+  // Debug useEffect to track expandedNote changes
+  useEffect(() => {
+    console.log("🔄 DEBUG: expandedNote state changed to:", expandedNote)
+  }, [expandedNote])
 
   const commonTags = [
     "work",
@@ -359,6 +370,24 @@ export function SuperNotes() {
 
   return (
     <div className="space-y-6">
+      {/* Debug Panel */}
+      <div className="fixed top-4 left-4 bg-red-500 text-white p-2 rounded z-[10000] text-xs">
+        <div>expandedNote: {expandedNote || "null"}</div>
+        <div>superNotes count: {superNotes.length}</div>
+        <div>filteredNotes count: {filteredNotes.length}</div>
+        <button 
+          onClick={() => {
+            const firstNote = filteredNotes[0]
+            if (firstNote) {
+              console.log("🧪 DEBUG: Test button clicked, opening note:", firstNote.id)
+              debugSetExpandedNote(firstNote.id)
+            }
+          }}
+          className="bg-blue-500 text-white px-2 py-1 rounded mt-1 text-xs"
+        >
+          Test Open Modal
+        </button>
+      </div>
       {/* Header */}
       <GlassCard className="p-4 sm:p-6">
         <div className="flex items-center justify-between mb-4 sm:mb-6">
@@ -591,7 +620,10 @@ export function SuperNotes() {
       {expandedNote && (
         <div 
           className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9999] flex items-center justify-center p-2 sm:p-4"
-          onClick={() => setExpandedNote(null)}
+          onClick={() => {
+            console.log("🖱️ DEBUG: Backdrop clicked, closing modal")
+            debugSetExpandedNote(null)
+          }}
         >
           <div 
             className="bg-white rounded-xl sm:rounded-2xl shadow-2xl w-full max-w-4xl max-h-[95vh] sm:max-h-[90vh] overflow-hidden"
@@ -599,7 +631,13 @@ export function SuperNotes() {
           >
             {(() => {
               const note = superNotes.find(n => n.id === expandedNote)
-              if (!note) return null
+              console.log("🔍 DEBUG: Looking for note with ID:", expandedNote)
+              console.log("🔍 DEBUG: Available notes:", superNotes.map(n => n.id))
+              console.log("🔍 DEBUG: Found note:", note)
+              if (!note) {
+                console.log("❌ DEBUG: Note not found!")
+                return <div className="p-8 text-center text-red-500">Note not found!</div>
+              }
               
               return (
                 <div className="h-full flex flex-col">
@@ -644,7 +682,10 @@ export function SuperNotes() {
                         <Trash2 className="w-4 h-4 sm:w-5 sm:h-5 text-red-500" />
                       </button>
                       <button
-                        onClick={() => setExpandedNote(null)}
+                        onClick={() => {
+                          console.log("🖱️ DEBUG: Close button clicked")
+                          debugSetExpandedNote(null)
+                        }}
                         className="glass-button p-2 sm:p-3 rounded-lg hover:scale-105 transition-all"
                         title="Close"
                       >
@@ -756,7 +797,11 @@ export function SuperNotes() {
                 key={note.id} 
                 className="p-4 sm:p-6 hover:scale-[1.02] transition-all cursor-pointer group"
               >
-                <div onClick={() => setExpandedNote(note.id)} className="h-full">
+                <div onClick={() => {
+                  console.log("🖱️ DEBUG: Card clicked for note:", note.id)
+                  console.log("🖱️ DEBUG: Current expandedNote state:", expandedNote)
+                  debugSetExpandedNote(note.id)
+                }} className="h-full">
                 <div className="flex items-start justify-between mb-3 sm:mb-4">
                   <div className="flex-1 min-w-0">
                     <h4 className="font-semibold text-slate-800 mb-2 group-hover:text-purple-600 transition-colors text-sm sm:text-base break-words">
