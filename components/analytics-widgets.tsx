@@ -2,16 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { GlassCard } from "@/components/glass-card"
-import { 
-  analyticsService, 
-  type AnalyticsData, 
-  type AnalyticsMetrics, 
-  type TrafficSource, 
-  type RealTimeData,
-  type GeographicData,
-  type DeviceData,
-  type PageData
-} from "@/lib/analytics-service"
+// Removed old analytics-service import - now using only realGoogleAnalyticsAPI
 import {
   realGoogleAnalyticsAPI, 
   type RealtimeData as GARealtimeData,
@@ -132,11 +123,11 @@ export function MetricCard({
       case 'percentage':
         return `${val}%`;
       case 'currency':
-        return analyticsService.formatCurrency(val);
+        return realGoogleAnalyticsAPI.formatCurrency(val);
       case 'duration':
-        return analyticsService.formatDuration(val);
+        return realGoogleAnalyticsAPI.formatDuration(val);
       default:
-        return analyticsService.formatNumber(val);
+        return realGoogleAnalyticsAPI.formatNumber(val);
     }
   };
 
@@ -221,228 +212,11 @@ export function MetricCard({
   );
 }
 
-interface RealTimeWidgetProps {
-  data: RealTimeData;
-  loading?: boolean;
-}
+// Removed old RealTimeWidget - now using RealTimeGoogleAnalyticsWidget with real data
 
-export function RealTimeWidget({ data, loading = false }: RealTimeWidgetProps) {
-  if (loading) {
-    return (
-      <GlassCard className="p-6">
-        <div className="animate-pulse">
-          <div className="h-6 bg-slate-200 rounded w-1/3 mb-4"></div>
-          <div className="h-16 bg-slate-200 rounded mb-4"></div>
-          <div className="grid grid-cols-2 gap-4">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-12 bg-slate-200 rounded"></div>
-            ))}
-          </div>
-        </div>
-      </GlassCard>
-    );
-  }
-
-  return (
-    <GlassCard className="p-6">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center space-x-3">
-          <Activity className="w-6 h-6 text-green-500" />
-          <h3 className="text-lg font-semibold text-slate-800">Real-Time Activity</h3>
-        </div>
-        <div className="flex items-center space-x-2">
-          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-          <span className="text-sm text-slate-500">Live</span>
-        </div>
-      </div>
-
-      <div className="text-center mb-6">
-        <div className="text-4xl font-bold text-slate-800 mb-2">
-          {data.activeUsers}
-        </div>
-        <p className="text-sm text-slate-600">Active Users Right Now</p>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-3">
-          <h4 className="text-sm font-medium text-slate-600">By Country</h4>
-          {data.activeUsersByCountry.slice(0, 3).map((country, index) => (
-            <div key={country.country} className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <div 
-                  className="w-3 h-3 rounded-full" 
-                  style={{ backgroundColor: COLORS[index % COLORS.length] }}
-                ></div>
-                <span className="text-sm text-slate-700">{country.country}</span>
-              </div>
-              <span className="text-sm font-semibold text-slate-800">
-                {country.activeUsers}
-              </span>
-            </div>
-          ))}
-        </div>
-
-        <div className="space-y-3">
-          <h4 className="text-sm font-medium text-slate-600">By Device</h4>
-          {data.activeUsersByDevice.map((device, index) => (
-            <div key={device.deviceCategory} className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                {device.deviceCategory === 'desktop' && <Monitor className="w-4 h-4 text-slate-500" />}
-                {device.deviceCategory === 'mobile' && <Smartphone className="w-4 h-4 text-slate-500" />}
-                {device.deviceCategory === 'tablet' && <Tablet className="w-4 h-4 text-slate-500" />}
-                <span className="text-sm text-slate-700 capitalize">{device.deviceCategory}</span>
-              </div>
-              <span className="text-sm font-semibold text-slate-800">
-                {device.activeUsers}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="mt-6 pt-4 border-t border-slate-200">
-        <h4 className="text-sm font-medium text-slate-600 mb-3">Top Pages</h4>
-        <div className="space-y-2">
-          {data.topPages.slice(0, 3).map((page, index) => (
-            <div key={page.pagePath} className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <span className="text-xs text-slate-500">#{index + 1}</span>
-                <span className="text-sm text-slate-700 truncate">{page.pageTitle}</span>
-              </div>
-              <span className="text-sm font-semibold text-slate-800">
-                {page.activeUsers}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </GlassCard>
-  );
-}
-
-interface TrafficSourcesWidgetProps {
-  data: TrafficSource[];
-  loading?: boolean;
-}
-
-export function TrafficSourcesWidget({ data, loading = false }: TrafficSourcesWidgetProps) {
-  if (loading) {
-    return (
-      <GlassCard className="p-6">
-        <div className="animate-pulse">
-          <div className="h-6 bg-slate-200 rounded w-1/3 mb-6"></div>
-          <div className="h-64 bg-slate-200 rounded"></div>
-        </div>
-      </GlassCard>
-    );
-  }
-
-  const totalSessions = data.reduce((sum, source) => sum + source.sessions, 0);
-
-  return (
-    <GlassCard className="p-6">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center space-x-3">
-          <Globe className="w-6 h-6 text-blue-500" />
-          <h3 className="text-lg font-semibold text-slate-800">Traffic Sources</h3>
-        </div>
-        <span className="text-sm text-slate-500">{totalSessions.toLocaleString()} total sessions</span>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Pie Chart */}
-        <div className="h-64">
-          <ResponsiveContainer width="100%" height="100%">
-            <RechartsPieChart>
-              <Pie
-                data={data.map((source, index) => ({
-                  name: source.source,
-                  value: source.sessions,
-                  color: COLORS[index % COLORS.length]
-                }))}
-                cx="50%"
-                cy="50%"
-                labelLine={false}
-                label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                outerRadius={80}
-                fill="#8884d8"
-                dataKey="value"
-              >
-                {data.map((_, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip 
-                formatter={(value: number) => [value.toLocaleString(), 'Sessions']}
-                contentStyle={{
-                  backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                  border: '1px solid rgba(255, 255, 255, 0.18)',
-                  borderRadius: '12px',
-                  backdropFilter: 'blur(8px)'
-                }}
-              />
-            </RechartsPieChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Source Details */}
-        <div className="space-y-4">
-          {data.map((source, index) => {
-            const percentage = (source.sessions / totalSessions) * 100;
-            return (
-              <div key={source.source} className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div 
-                      className="w-4 h-4 rounded-full" 
-                      style={{ backgroundColor: COLORS[index % COLORS.length] }}
-                    ></div>
-                    <div>
-                      <p className="font-semibold text-slate-800 capitalize">{source.source}</p>
-                      <p className="text-sm text-slate-500">{source.medium}</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-semibold text-slate-800">
-                      {analyticsService.formatNumber(source.sessions)}
-                    </p>
-                    <p className="text-sm text-slate-500">{percentage.toFixed(1)}%</p>
-                  </div>
-                </div>
-                <div className="w-full bg-slate-200 rounded-full h-2">
-                  <div 
-                    className="h-2 rounded-full transition-all duration-300"
-                    style={{ 
-                      width: `${percentage}%`,
-                      backgroundColor: COLORS[index % COLORS.length]
-                    }}
-                  ></div>
-                </div>
-                <div className="grid grid-cols-3 gap-4 text-xs text-slate-600">
-                  <div>
-                    <span className="block">Users</span>
-                    <span className="font-semibold">{analyticsService.formatNumber(source.users)}</span>
-                  </div>
-                  <div>
-                    <span className="block">Bounce Rate</span>
-                    <span className="font-semibold">{analyticsService.formatPercentage(source.bounceRate)}</span>
-                  </div>
-                  <div>
-                    <span className="block">Avg Duration</span>
-                    <span className="font-semibold">{analyticsService.formatDuration(source.avgSessionDuration)}</span>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </GlassCard>
-  );
-}
 
 interface GeographicWidgetProps {
-  data: GeographicData[];
+  data: GeographicMetrics[];
   loading?: boolean;
 }
 
@@ -471,7 +245,7 @@ export function GeographicWidget({ data, loading = false }: GeographicWidgetProp
 
       <div className="space-y-4">
         {data.map((location, index) => (
-          <div key={`${location.country}-${location.city}`} className="glass-panel p-4 rounded-lg">
+          <div key={location.country} className="glass-panel p-4 rounded-lg">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center space-x-3">
                 <div 
@@ -480,15 +254,14 @@ export function GeographicWidget({ data, loading = false }: GeographicWidgetProp
                 ></div>
                 <div>
                   <p className="font-semibold text-slate-800">{location.country}</p>
-                  <p className="text-sm text-slate-500">{location.city}</p>
                 </div>
               </div>
               <div className="text-right">
                 <p className="font-semibold text-slate-800">
-                  {analyticsService.formatNumber(location.sessions)}
+                  {realGoogleAnalyticsAPI.formatNumber(location.sessions)}
                 </p>
                 <p className="text-sm text-slate-500">
-                  {analyticsService.formatNumber(location.users)} users
+                  {realGoogleAnalyticsAPI.formatNumber(location.totalUsers)} users
                 </p>
               </div>
             </div>
@@ -509,7 +282,7 @@ export function GeographicWidget({ data, loading = false }: GeographicWidgetProp
 }
 
 interface DeviceWidgetProps {
-  data: DeviceData[];
+  data: DeviceMetrics[];
   loading?: boolean;
 }
 
@@ -552,7 +325,7 @@ export function DeviceWidget({ data, loading = false }: DeviceWidgetProps) {
                 </div>
                 <div className="text-right">
                   <p className="text-2xl font-bold text-slate-800">
-                    {analyticsService.formatNumber(device.sessions)}
+                    {realGoogleAnalyticsAPI.formatNumber(device.sessions)}
                   </p>
                   <p className="text-sm text-slate-500">sessions</p>
                 </div>
@@ -572,13 +345,13 @@ export function DeviceWidget({ data, loading = false }: DeviceWidgetProps) {
                 <div>
                   <span className="text-slate-600">Users</span>
                   <p className="font-semibold text-slate-800">
-                    {analyticsService.formatNumber(device.users)}
+                    {realGoogleAnalyticsAPI.formatNumber(device.totalUsers)}
                   </p>
                 </div>
                 <div>
                   <span className="text-slate-600">Bounce Rate</span>
                   <p className="font-semibold text-slate-800">
-                    {analyticsService.formatPercentage(device.bounceRate)}
+                    {realGoogleAnalyticsAPI.formatPercentage(device.bounceRate)}
                   </p>
                 </div>
               </div>
@@ -591,7 +364,7 @@ export function DeviceWidget({ data, loading = false }: DeviceWidgetProps) {
 }
 
 interface TopPagesWidgetProps {
-  data: PageData[];
+  data: Array<{ pagePath: string; pageTitle: string; activeUsers: number }>;
   loading?: boolean;
 }
 
@@ -636,30 +409,9 @@ export function TopPagesWidget({ data, loading = false }: TopPagesWidgetProps) {
               </div>
               <div className="text-right">
                 <p className="text-lg font-bold text-slate-800">
-                  {analyticsService.formatNumber(page.pageviews)}
+                  {realGoogleAnalyticsAPI.formatNumber(page.activeUsers)}
                 </p>
-                <p className="text-sm text-slate-500">pageviews</p>
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-3 gap-4 text-sm">
-              <div>
-                <span className="text-slate-600">Unique Views</span>
-                <p className="font-semibold text-slate-800">
-                  {analyticsService.formatNumber(page.uniquePageviews)}
-                </p>
-              </div>
-              <div>
-                <span className="text-slate-600">Avg Time</span>
-                <p className="font-semibold text-slate-800">
-                  {analyticsService.formatDuration(page.avgTimeOnPage)}
-                </p>
-              </div>
-              <div>
-                <span className="text-slate-600">Bounce Rate</span>
-                <p className="font-semibold text-slate-800">
-                  {analyticsService.formatPercentage(page.bounceRate)}
-                </p>
+                <p className="text-sm text-slate-500">active users</p>
               </div>
             </div>
           </div>
@@ -670,7 +422,7 @@ export function TopPagesWidget({ data, loading = false }: TopPagesWidgetProps) {
 }
 
 interface AnalyticsOverviewProps {
-  data: AnalyticsData;
+  data: StandardMetrics;
   loading?: boolean;
   onRefresh?: () => void;
 }
@@ -694,7 +446,7 @@ export function AnalyticsOverview({ data, loading = false, onRefresh }: Analytic
     );
   }
 
-  const { metrics } = data;
+  const metrics = data;
 
   return (
     <div className="space-y-6">
@@ -713,7 +465,7 @@ export function AnalyticsOverview({ data, loading = false, onRefresh }: Analytic
         
         <MetricCard
           title="Users"
-          value={metrics.users}
+          value={metrics.totalUsers}
           change={8.3}
           changeType="increase"
           icon={Users}
@@ -724,7 +476,7 @@ export function AnalyticsOverview({ data, loading = false, onRefresh }: Analytic
         
         <MetricCard
           title="Page Views"
-          value={metrics.pageviews}
+          value={metrics.screenPageViews}
           change={-2.1}
           changeType="decrease"
           icon={Eye}
@@ -746,7 +498,7 @@ export function AnalyticsOverview({ data, loading = false, onRefresh }: Analytic
         
         <MetricCard
           title="Avg Session Duration"
-          value={metrics.avgSessionDuration}
+          value={metrics.averageSessionDuration}
           change={15.7}
           changeType="increase"
           icon={Clock}
