@@ -11,7 +11,7 @@ import {
   type MarketingMetrics 
 } from "@/lib/everythingenglish-api"
 import { RealAnalyticsDashboard } from "@/components/real-analytics-dashboard"
-import { googleAnalyticsAPI, type StandardMetrics, type GeographicMetrics } from "@/lib/google-analytics-api"
+import { realGoogleAnalyticsAPI, type StandardMetrics, type GeographicMetrics } from "@/lib/real-google-analytics-api"
 import {
   BarChart3,
   Users,
@@ -99,8 +99,8 @@ export function EnhancedMarketingDashboard() {
     try {
       setAnalyticsError(null)
       const [standardMetrics, geographicMetrics] = await Promise.all([
-        googleAnalyticsAPI.getStandardMetrics(timeRange),
-        googleAnalyticsAPI.getGeographicMetrics(timeRange)
+        realGoogleAnalyticsAPI.getStandardMetrics(timeRange),
+        realGoogleAnalyticsAPI.getGeographicMetrics(timeRange)
       ])
       setAnalyticsMetrics(standardMetrics)
       setGeographicData(geographicMetrics)

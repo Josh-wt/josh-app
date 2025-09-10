@@ -9,9 +9,9 @@ import {
   MetricCard
 } from "@/components/analytics-widgets"
 import { 
-  googleAnalyticsAPI, 
+  realGoogleAnalyticsAPI, 
   type StandardMetrics
-} from "@/lib/google-analytics-api"
+} from "@/lib/real-google-analytics-api"
 import {
   Users,
   Eye,
@@ -39,7 +39,7 @@ export function RealAnalyticsDashboard({ className = "", days = 7 }: RealAnalyti
     try {
       setIsLoading(true);
       setError(null);
-      const standardMetrics = await googleAnalyticsAPI.getStandardMetrics(days);
+      const standardMetrics = await realGoogleAnalyticsAPI.getStandardMetrics(days);
       setMetrics(standardMetrics);
       setLastUpdated(new Date());
     } catch (err) {
@@ -227,17 +227,17 @@ export function RealAnalyticsDashboard({ className = "", days = 7 }: RealAnalyti
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="text-center">
               <div className="text-2xl font-bold text-slate-800">
-                {googleAnalyticsAPI.formatNumber(metrics.sessions)}
+                {realGoogleAnalyticsAPI.formatNumber(metrics.sessions)}
               </div>
               <div className="text-sm text-slate-600">Total Sessions</div>
               <div className="text-xs text-slate-500 mt-1">
-                {googleAnalyticsAPI.formatNumber(metrics.totalUsers)} unique users
+                {realGoogleAnalyticsAPI.formatNumber(metrics.totalUsers)} unique users
               </div>
             </div>
             
             <div className="text-center">
               <div className="text-2xl font-bold text-slate-800">
-                {googleAnalyticsAPI.formatNumber(metrics.screenPageViews)}
+                {realGoogleAnalyticsAPI.formatNumber(metrics.screenPageViews)}
               </div>
               <div className="text-sm text-slate-600">Page Views</div>
               <div className="text-xs text-slate-500 mt-1">
@@ -247,11 +247,11 @@ export function RealAnalyticsDashboard({ className = "", days = 7 }: RealAnalyti
             
             <div className="text-center">
               <div className="text-2xl font-bold text-slate-800">
-                {googleAnalyticsAPI.formatDuration(metrics.averageSessionDuration)}
+                {realGoogleAnalyticsAPI.formatDuration(metrics.averageSessionDuration)}
               </div>
               <div className="text-sm text-slate-600">Avg Session Duration</div>
               <div className="text-xs text-slate-500 mt-1">
-                {googleAnalyticsAPI.formatPercentage(metrics.bounceRate)} bounce rate
+                {realGoogleAnalyticsAPI.formatPercentage(metrics.bounceRate)} bounce rate
               </div>
             </div>
           </div>

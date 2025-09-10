@@ -1,13 +1,8 @@
 "use client"
 
-// Google Analytics API Service
+// Real Google Analytics API Service
 // This service provides methods to fetch real-time data from Google Analytics
-// using the available MCP tools
-
-export interface GoogleAnalyticsConfig {
-  propertyId: string;
-  cacheTimeout?: number;
-}
+// using the available MCP tools directly
 
 export interface RealtimeData {
   activeUsers: number;
@@ -50,15 +45,10 @@ export interface DeviceMetrics {
   averageSessionDuration: number;
 }
 
-class GoogleAnalyticsAPI {
-  private propertyId: string;
+class RealGoogleAnalyticsAPI {
+  private propertyId: string = "495635139"; // everythingenglishai1 property ID
   private cache: Map<string, { data: any; timestamp: number }> = new Map();
-  private cacheTimeout: number;
-
-  constructor(config: GoogleAnalyticsConfig) {
-    this.propertyId = config.propertyId;
-    this.cacheTimeout = config.cacheTimeout || 5 * 60 * 1000; // 5 minutes default
-  }
+  private cacheTimeout: number = 5 * 60 * 1000; // 5 minutes
 
   private getCacheKey(method: string, params: any): string {
     return `${method}_${JSON.stringify(params)}`;
@@ -87,22 +77,6 @@ class GoogleAnalyticsAPI {
     }];
   }
 
-  private async callMCPTool(toolName: string, params: any): Promise<any> {
-    // This method will call the actual MCP tools
-    // We'll use dynamic imports or direct calls to the MCP tools
-    if (toolName === 'run_report') {
-      // Call the actual MCP tool for run_report
-      // This would be replaced with the actual MCP tool call
-      const { mcp_analytics-mcp_run_report } = await import('@tool-ai/google-analytics-mcp');
-      return await mcp_analytics-mcp_run_report(params);
-    } else if (toolName === 'run_realtime_report') {
-      // Call the actual MCP tool for run_realtime_report
-      const { mcp_analytics-mcp_run_realtime_report } = await import('@tool-ai/google-analytics-mcp');
-      return await mcp_analytics-mcp_run_realtime_report(params);
-    }
-    throw new Error(`Unknown tool: ${toolName}`);
-  }
-
   // Get real-time data
   async getRealtimeData(): Promise<RealtimeData> {
     const cacheKey = this.getCacheKey('realtime', {});
@@ -110,8 +84,8 @@ class GoogleAnalyticsAPI {
     if (cached) return cached;
 
     try {
-      // Make actual API call to Google Analytics Realtime API
-      const response = await this.callMCPTool('run_realtime_report', {
+      // Call the actual MCP tool for real-time data
+      const response = await mcp_analytics-mcp_run_realtime_report({
         property_id: this.propertyId,
         dimensions: [
           { name: "country" },
@@ -178,8 +152,8 @@ class GoogleAnalyticsAPI {
     try {
       const dateRanges = this.generateDateRanges(days);
       
-      // Make actual API call to Google Analytics
-      const response = await this.callMCPTool('run_report', {
+      // Call the actual MCP tool for standard metrics
+      const response = await mcp_analytics-mcp_run_report({
         property_id: this.propertyId,
         date_ranges: dateRanges,
         metrics: [
@@ -234,8 +208,8 @@ class GoogleAnalyticsAPI {
     try {
       const dateRanges = this.generateDateRanges(days);
       
-      // Make actual API call to Google Analytics
-      const response = await this.callMCPTool('run_report', {
+      // Call the actual MCP tool for geographic metrics
+      const response = await mcp_analytics-mcp_run_report({
         property_id: this.propertyId,
         date_ranges: dateRanges,
         dimensions: [{ name: "country" }],
@@ -274,12 +248,30 @@ class GoogleAnalyticsAPI {
     if (cached) return cached;
 
     try {
-      // Return real data from Google Analytics API
-      const metrics: DeviceMetrics[] = [
-        { deviceCategory: "desktop", sessions: 239, totalUsers: 168, screenPageViews: 591, bounceRate: 0.623, averageSessionDuration: 174 },
-        { deviceCategory: "mobile", sessions: 65, totalUsers: 50, screenPageViews: 255, bounceRate: 0.431, averageSessionDuration: 171 },
-        { deviceCategory: "tablet", sessions: 2, totalUsers: 2, screenPageViews: 3, bounceRate: 0.5, averageSessionDuration: 12 }
-      ];
+      const dateRanges = this.generateDateRanges(days);
+      
+      // Call the actual MCP tool for device metrics
+      const response = await mcp_analytics-mcp_run_report({
+        property_id: this.propertyId,
+        date_ranges: dateRanges,
+        dimensions: [{ name: "deviceCategory" }],
+        metrics: [
+          { name: "sessions" },
+          { name: "totalUsers" },
+          { name: "screenPageViews" },
+          { name: "bounceRate" },
+          { name: "averageSessionDuration" }
+        ]
+      });
+
+      const metrics: DeviceMetrics[] = response.result.rows?.map((row: any) => ({
+        deviceCategory: row.dimension_values[0]?.value || '(not set)',
+        sessions: parseInt(row.metric_values[0].value),
+        totalUsers: parseInt(row.metric_values[1].value),
+        screenPageViews: parseInt(row.metric_values[2].value),
+        bounceRate: parseFloat(row.metric_values[3].value),
+        averageSessionDuration: parseFloat(row.metric_values[4].value)
+      })) || [];
 
       this.setCachedData(cacheKey, metrics);
       return metrics;
@@ -289,12 +281,7 @@ class GoogleAnalyticsAPI {
     }
   }
 
-  // Clear cache
-  clearCache(): void {
-    this.cache.clear();
-  }
-
-  // Format numbers
+  // Utility methods
   formatNumber(num: number): string {
     if (num >= 1000000) {
       return (num / 1000000).toFixed(1) + 'M';
@@ -304,22 +291,26 @@ class GoogleAnalyticsAPI {
     return num.toString();
   }
 
-  // Format percentage
   formatPercentage(decimal: number): string {
     return (decimal * 100).toFixed(1) + '%';
   }
 
-  // Format duration
   formatDuration(seconds: number): string {
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = Math.floor(seconds % 60);
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   }
+
+  formatCurrency(amount: number, currency: string = 'USD'): string {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: currency
+    }).format(amount);
+  }
+
+  refreshCache(): void {
+    this.cache.clear();
+  }
 }
 
-// Export singleton instance
-export const googleAnalyticsAPI = new GoogleAnalyticsAPI({
-  propertyId: "495635139" // everythingenglishai1 property ID
-});
-
-export default googleAnalyticsAPI;
+export const realGoogleAnalyticsAPI = new RealGoogleAnalyticsAPI();

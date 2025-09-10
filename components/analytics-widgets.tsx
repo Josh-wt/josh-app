@@ -12,13 +12,13 @@ import {
   type DeviceData,
   type PageData
 } from "@/lib/analytics-service"
-import { 
-  googleAnalyticsAPI, 
+import {
+  realGoogleAnalyticsAPI, 
   type RealtimeData as GARealtimeData,
   type StandardMetrics,
   type GeographicMetrics,
   type DeviceMetrics
-} from "@/lib/google-analytics-api"
+} from "@/lib/real-google-analytics-api"
 import {
   Users,
   Eye,
@@ -843,7 +843,7 @@ export function RealTimeGoogleAnalyticsWidget({ loading = false }: RealTimeGoogl
       try {
         setIsLoading(true);
         setError(null);
-        const realtimeData = await googleAnalyticsAPI.getRealtimeData();
+        const realtimeData = await realGoogleAnalyticsAPI.getRealtimeData();
         setData(realtimeData);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to fetch real-time data');
@@ -977,7 +977,7 @@ export function GeographicGoogleAnalyticsWidget({ loading = false, days = 7 }: G
       try {
         setIsLoading(true);
         setError(null);
-        const geographicData = await googleAnalyticsAPI.getGeographicMetrics(days);
+        const geographicData = await realGoogleAnalyticsAPI.getGeographicMetrics(days);
         setData(geographicData);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to fetch geographic data');
@@ -1037,12 +1037,12 @@ export function GeographicGoogleAnalyticsWidget({ loading = false, days = 7 }: G
                 ></div>
                 <div>
                   <p className="font-semibold text-slate-800">{location.country}</p>
-                  <p className="text-sm text-slate-500">{googleAnalyticsAPI.formatNumber(location.totalUsers)} users</p>
+                  <p className="text-sm text-slate-500">{realGoogleAnalyticsAPI.formatNumber(location.totalUsers)} users</p>
                 </div>
               </div>
               <div className="text-right">
                 <p className="font-semibold text-slate-800">
-                  {googleAnalyticsAPI.formatNumber(location.sessions)}
+                  {realGoogleAnalyticsAPI.formatNumber(location.sessions)}
                 </p>
                 <p className="text-sm text-slate-500">sessions</p>
               </div>
@@ -1059,15 +1059,15 @@ export function GeographicGoogleAnalyticsWidget({ loading = false, days = 7 }: G
             <div className="grid grid-cols-3 gap-4 text-xs text-slate-600 mt-2">
               <div>
                 <span className="block">Bounce Rate</span>
-                <span className="font-semibold">{googleAnalyticsAPI.formatPercentage(location.bounceRate)}</span>
+                <span className="font-semibold">{realGoogleAnalyticsAPI.formatPercentage(location.bounceRate)}</span>
               </div>
               <div>
                 <span className="block">Avg Duration</span>
-                <span className="font-semibold">{googleAnalyticsAPI.formatDuration(location.averageSessionDuration)}</span>
+                <span className="font-semibold">{realGoogleAnalyticsAPI.formatDuration(location.averageSessionDuration)}</span>
               </div>
               <div>
                 <span className="block">Page Views</span>
-                <span className="font-semibold">{googleAnalyticsAPI.formatNumber(location.screenPageViews)}</span>
+                <span className="font-semibold">{realGoogleAnalyticsAPI.formatNumber(location.screenPageViews)}</span>
               </div>
             </div>
           </div>
@@ -1093,7 +1093,7 @@ export function DeviceGoogleAnalyticsWidget({ loading = false, days = 7 }: Devic
       try {
         setIsLoading(true);
         setError(null);
-        const deviceData = await googleAnalyticsAPI.getDeviceMetrics(days);
+        const deviceData = await realGoogleAnalyticsAPI.getDeviceMetrics(days);
         setData(deviceData);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to fetch device data');
@@ -1158,7 +1158,7 @@ export function DeviceGoogleAnalyticsWidget({ loading = false, days = 7 }: Devic
                 </div>
                 <div className="text-right">
                   <p className="text-2xl font-bold text-slate-800">
-                    {googleAnalyticsAPI.formatNumber(device.sessions)}
+                    {realGoogleAnalyticsAPI.formatNumber(device.sessions)}
                   </p>
                   <p className="text-sm text-slate-500">sessions</p>
                 </div>
@@ -1178,19 +1178,19 @@ export function DeviceGoogleAnalyticsWidget({ loading = false, days = 7 }: Devic
                 <div>
                   <span className="text-slate-600">Users</span>
                   <p className="font-semibold text-slate-800">
-                    {googleAnalyticsAPI.formatNumber(device.totalUsers)}
+                    {realGoogleAnalyticsAPI.formatNumber(device.totalUsers)}
                   </p>
                 </div>
                 <div>
                   <span className="text-slate-600">Bounce Rate</span>
                   <p className="font-semibold text-slate-800">
-                    {googleAnalyticsAPI.formatPercentage(device.bounceRate)}
+                    {realGoogleAnalyticsAPI.formatPercentage(device.bounceRate)}
                   </p>
                 </div>
                 <div>
                   <span className="text-slate-600">Avg Duration</span>
                   <p className="font-semibold text-slate-800">
-                    {googleAnalyticsAPI.formatDuration(device.averageSessionDuration)}
+                    {realGoogleAnalyticsAPI.formatDuration(device.averageSessionDuration)}
                   </p>
                 </div>
               </div>
