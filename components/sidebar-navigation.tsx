@@ -180,7 +180,7 @@ export function SidebarNavigation({ onClose }: SidebarNavigationProps) {
             <div className="w-8 h-8 bg-gradient-to-r from-cyan-400 to-blue-500 rounded-lg flex items-center justify-center">
               <span className="text-white font-bold text-sm">J</span>
             </div>
-            <h1 className="text-lg sm:text-xl font-bold text-slate-800">Josh App <span className="text-xs text-slate-500 font-normal">v3</span></h1>
+            <h1 className="text-lg sm:text-xl font-bold text-slate-800">Josh App <span className="text-xs text-slate-500 font-normal">v4</span></h1>
           </div>
           
           {/* Mobile Close Button */}
