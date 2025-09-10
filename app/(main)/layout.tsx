@@ -52,7 +52,7 @@ export default function MainLayout({
                   
                   <div>
                     <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent">
-                      Josh App
+                      Josh App <span className="text-xs sm:text-sm text-slate-500 font-normal">v1</span>
                     </h1>
                     <p className="text-xs sm:text-sm text-slate-600 mt-1 hidden sm:block">
                       Your personal productivity & creativity hub
