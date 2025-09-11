@@ -10,33 +10,35 @@ export default function NotesPage() {
   const [activeTab, setActiveTab] = useState<"notes" | "super-notes">("notes")
 
   return (
-    <div className="space-y-4 sm:space-y-6">
+    <div className="mobile-space-y">
       {/* Tab Navigation */}
-      <div className="flex items-center gap-1 sm:gap-2 p-1 glass-button rounded-lg w-full sm:w-fit">
-        <button
-          onClick={() => setActiveTab("notes")}
-          className={cn(
-            "flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-2 rounded-md transition-all flex-1 sm:flex-none text-center justify-center",
-            activeTab === "notes"
-              ? "bg-white shadow-sm text-slate-800"
-              : "text-slate-600 hover:text-slate-800"
-          )}
-        >
-          <StickyNote className="w-3 h-3 sm:w-4 sm:h-4" />
-          <span className="text-xs sm:text-sm">Regular</span>
-        </button>
-        <button
-          onClick={() => setActiveTab("super-notes")}
-          className={cn(
-            "flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-2 rounded-md transition-all flex-1 sm:flex-none text-center justify-center",
-            activeTab === "super-notes"
-              ? "bg-white shadow-sm text-slate-800"
-              : "text-slate-600 hover:text-slate-800"
-          )}
-        >
-          <Layers className="w-3 h-3 sm:w-4 sm:h-4" />
-          <span className="text-xs sm:text-sm">Super</span>
-        </button>
+      <div className="glass-panel p-1 rounded-lg w-full">
+        <div className="mobile-flex-row">
+          <button
+            onClick={() => setActiveTab("notes")}
+            className={cn(
+              "mobile-flex-row flex-1 glass-button rounded-md transition-all touch-target text-center justify-center",
+              activeTab === "notes"
+                ? "bg-white shadow-sm text-slate-800"
+                : "text-slate-600 hover:text-slate-800"
+            )}
+          >
+            <StickyNote className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span className="mobile-text font-medium">Regular</span>
+          </button>
+          <button
+            onClick={() => setActiveTab("super-notes")}
+            className={cn(
+              "mobile-flex-row flex-1 glass-button rounded-md transition-all touch-target text-center justify-center",
+              activeTab === "super-notes"
+                ? "bg-white shadow-sm text-slate-800"
+                : "text-slate-600 hover:text-slate-800"
+            )}
+          >
+            <Layers className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span className="mobile-text font-medium">Super</span>
+          </button>
+        </div>
       </div>
 
       {/* Tab Content */}

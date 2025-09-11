@@ -10,8 +10,8 @@ interface GlassCardProps {
 export function GlassCard({ children, className, hover = false }: GlassCardProps) {
   return (
     <div className={cn(
-      "glass-panel", 
-      hover && "glass-hover", 
+      "glass-panel",
+      hover && "hover:scale-[1.02] hover:shadow-lg",
       "transition-all duration-200",
       className
     )}>
