@@ -11,8 +11,10 @@ export async function middleware(request: NextRequest) {
 
   // Check if environment variables are available
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-    console.warn('Supabase environment variables not found, skipping authentication')
-    return NextResponse.next()
+    console.warn('Supabase environment variables not found, redirecting to login')
+    const url = request.nextUrl.clone()
+    url.pathname = "/login"
+    return NextResponse.redirect(url)
   }
 
   let supabaseResponse = NextResponse.next({
@@ -48,7 +50,7 @@ export async function middleware(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      // no user, potentially respond by redirecting the user to the login page
+      // no user, redirect to login page
       const url = request.nextUrl.clone()
       url.pathname = "/login"
       return NextResponse.redirect(url)
@@ -70,8 +72,10 @@ export async function middleware(request: NextRequest) {
     return supabaseResponse
   } catch (error) {
     console.error('Middleware error:', error)
-    // If there's an error with Supabase, just continue without authentication
-    return NextResponse.next()
+    // If there's an error with Supabase, redirect to login
+    const url = request.nextUrl.clone()
+    url.pathname = "/login"
+    return NextResponse.redirect(url)
   }
 }
 
