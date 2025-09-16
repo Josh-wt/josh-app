@@ -111,85 +111,201 @@ export function SubscriptionManager() {
   const [selectedSubscription, setSelectedSubscription] = useState<Subscription | null>(null)
   const [showDetailsModal, setShowDetailsModal] = useState(false)
   
+  // Add subscription form state
+  const [newSubscription, setNewSubscription] = useState({
+    name: '',
+    description: '',
+    cost: '',
+    billing_cycle: 'monthly' as 'weekly' | 'monthly' | 'quarterly' | 'yearly' | 'one-time',
+    category: '',
+    payment_method: '',
+    website_url: '',
+    logo_url: '',
+    color: '#3B82F6',
+    start_date: new Date().toISOString().split('T')[0],
+    next_billing_date: '',
+    end_date: '',
+    trial_end_date: '',
+    status: 'active' as 'active' | 'paused' | 'cancelled' | 'trial' | 'expired',
+    is_essential: false,
+    auto_renew: true,
+    usage_limit: '',
+    current_usage: 0,
+    usage_unit: '',
+    reminder_days: [1, 7],
+    tags: '',
+    notes: '',
+    rating: 5
+  })
+  
+  // Form submission handler
+  const handleAddSubscription = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    try {
+      const subscriptionData = {
+        ...newSubscription,
+        cost: parseFloat(newSubscription.cost),
+        usage_limit: newSubscription.usage_limit ? parseInt(newSubscription.usage_limit) : null,
+        tags: newSubscription.tags ? newSubscription.tags.split(',').map(tag => tag.trim()) : [],
+        annual_cost: calculateAnnualCost(parseFloat(newSubscription.cost), newSubscription.billing_cycle)
+      }
+      
+      const { data, error } = await supabase
+        .from('subscriptions')
+        .insert([subscriptionData])
+        .select()
+      
+      if (error) {
+        console.error('Error adding subscription:', error)
+        return
+      }
+      
+      // Refresh the subscriptions list
+      await fetchSubscriptions()
+      
+      // Reset form and close modal
+      setNewSubscription({
+        name: '',
+        description: '',
+        cost: '',
+        billing_cycle: 'monthly',
+        category: '',
+        payment_method: '',
+        website_url: '',
+        logo_url: '',
+        color: '#3B82F6',
+        start_date: new Date().toISOString().split('T')[0],
+        next_billing_date: '',
+        end_date: '',
+        trial_end_date: '',
+        status: 'active',
+        is_essential: false,
+        auto_renew: true,
+        usage_limit: '',
+        current_usage: 0,
+        usage_unit: '',
+        reminder_days: [1, 7],
+        tags: '',
+        notes: '',
+        rating: 5
+      })
+      setShowAddModal(false)
+    } catch (error) {
+      console.error('Error adding subscription:', error)
+    }
+  }
+  
+  // Helper function to calculate annual cost
+  const calculateAnnualCost = (cost: number, cycle: string) => {
+    switch (cycle) {
+      case 'weekly': return cost * 52
+      case 'monthly': return cost * 12
+      case 'quarterly': return cost * 4
+      case 'yearly': return cost
+      case 'one-time': return cost
+      default: return cost * 12
+    }
+  }
+  
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  
   const supabase = createClient()
+
+  // Fetch subscriptions function
+  const fetchSubscriptions = async () => {
+    try {
+      setLoading(true)
+
+      // Fetch subscriptions
+      const { data: subsData, error: subsError } = await supabase
+        .from('subscriptions')
+        .select('*')
+        .order('created_at', { ascending: false })
+
+      if (subsError) throw subsError
+
+      const transformedSubs = subsData?.map(sub => ({
+        id: sub.id,
+        user_id: sub.user_id,
+        name: sub.name,
+        description: sub.description,
+        cost: sub.cost,
+        billing_cycle: sub.billing_cycle,
+        category: sub.category,
+        payment_method: sub.payment_method,
+        website_url: sub.website_url,
+        logo_url: sub.logo_url,
+        color: sub.color,
+        start_date: sub.start_date,
+        next_billing_date: sub.next_billing_date,
+        end_date: sub.end_date,
+        trial_end_date: sub.trial_end_date,
+        status: sub.status,
+        is_essential: sub.is_essential,
+        auto_renew: sub.auto_renew,
+        usage_limit: sub.usage_limit,
+        current_usage: sub.current_usage,
+        usage_unit: sub.usage_unit,
+        reminder_days: sub.reminder_days || [],
+        last_reminder_sent: sub.last_reminder_sent,
+        annual_cost: sub.annual_cost,
+        tags: sub.tags || [],
+        notes: sub.notes,
+        rating: sub.rating,
+        last_used_date: sub.last_used_date,
+        created_at: sub.created_at,
+        updated_at: sub.updated_at
+      })) || []
+
+      setSubscriptions(transformedSubs)
+
+      // Calculate analytics
+      const totalCost = transformedSubs.reduce((sum, sub) => sum + (sub.cost || 0), 0)
+      const activeSubs = transformedSubs.filter(sub => sub.status === 'active')
+      const activeCost = activeSubs.reduce((sum, sub) => sum + (sub.cost || 0), 0)
+      
+      const categoryBreakdown = transformedSubs.reduce((acc, sub) => {
+        if (sub.status === 'active') {
+          acc[sub.category] = (acc[sub.category] || 0) + (sub.cost || 0)
+        }
+        return acc
+      }, {} as Record<string, number>)
+
+      const topCategories = Object.entries(categoryBreakdown)
+        .map(([category, amount]) => ({
+          category,
+          amount: amount as number,
+          count: transformedSubs.filter(sub => sub.category === category && sub.status === 'active').length
+        }))
+        .sort((a, b) => b.amount - a.amount)
+        .slice(0, 5)
+
+      setAnalytics({
+        totalMonthly: totalCost,
+        totalYearly: transformedSubs.reduce((sum, sub) => sum + calculateAnnualCost(sub.cost || 0, sub.billing_cycle), 0),
+        activeSubscriptions: activeSubs.length,
+        cancelledThisMonth: transformedSubs.filter(sub => sub.status === 'cancelled' && 
+          new Date(sub.updated_at).getMonth() === new Date().getMonth()).length,
+        savingsThisMonth: 0, // Could be calculated based on cancelled subscriptions
+        upcomingBills: transformedSubs.filter(sub => sub.status === 'active' && 
+          new Date(sub.next_billing_date) <= new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)).length,
+        categoryBreakdown,
+        spendingTrend: [], // Could be calculated from historical data
+        topCategories
+      })
+
+    } catch (error) {
+      console.error('Error fetching subscriptions:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   // Fetch subscriptions data
   useEffect(() => {
-    const fetchSubscriptions = async () => {
-      try {
-        setLoading(true)
-
-        // Fetch subscriptions
-        const { data: subsData, error: subsError } = await supabase
-          .from('subscriptions')
-          .select('*')
-          .order('created_at', { ascending: false })
-
-        if (subsError) throw subsError
-
-        const transformedSubs = subsData?.map(sub => ({
-          ...sub,
-          cost: parseFloat(sub.cost),
-          annual_cost: parseFloat(sub.annual_cost),
-          current_usage: sub.current_usage || 0,
-          reminder_days: sub.reminder_days || [7, 3, 1],
-          tags: sub.tags || [],
-          is_essential: sub.is_essential || false,
-          auto_renew: sub.auto_renew || true
-        })) || []
-
-        setSubscriptions(transformedSubs)
-
-        // Calculate analytics
-        const totalMonthly = transformedSubs
-          .filter(sub => sub.billing_cycle === 'monthly' && sub.status === 'active')
-          .reduce((sum, sub) => sum + sub.cost, 0)
-
-        const totalYearly = transformedSubs
-          .filter(sub => sub.billing_cycle === 'yearly' && sub.status === 'active')
-          .reduce((sum, sub) => sum + sub.cost, 0)
-
-        const activeSubscriptions = transformedSubs.filter(sub => sub.status === 'active').length
-
-        const categoryBreakdown = transformedSubs.reduce((acc, sub) => {
-          if (sub.status === 'active') {
-            acc[sub.category] = (acc[sub.category] || 0) + sub.cost
-          }
-          return acc
-        }, {} as { [key: string]: number })
-
-        const topCategories = Object.entries(categoryBreakdown)
-          .map(([category, amount]) => ({
-            category,
-            amount: amount as number,
-            count: transformedSubs.filter(sub => sub.category === category && sub.status === 'active').length
-          }))
-          .sort((a, b) => b.amount - a.amount)
-          .slice(0, 5)
-
-        setAnalytics({
-          totalMonthly,
-          totalYearly,
-          activeSubscriptions,
-          cancelledThisMonth: 0, // You can calculate this based on end_date
-          savingsThisMonth: 0, // You can calculate this from payment history
-          upcomingBills: transformedSubs
-            .filter(sub => sub.status === 'active')
-            .reduce((sum, sub) => sum + sub.cost, 0),
-          categoryBreakdown,
-          spendingTrend: [], // You can calculate this from payment history
-          topCategories
-        })
-
-      } catch (error) {
-        console.error('Error fetching subscriptions:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
     fetchSubscriptions()
-  }, [supabase])
+  }, [])
 
   // Filtered and sorted subscriptions
   const filteredSubscriptions = useMemo(() => {
@@ -624,15 +740,173 @@ export function SubscriptionManager() {
             <DialogTitle>Add New Subscription</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <p className="text-slate-600">Add subscription form will be implemented here.</p>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setShowAddModal(false)}>
-                Cancel
-              </Button>
-              <Button onClick={() => setShowAddModal(false)}>
-                Add Subscription
-              </Button>
-            </div>
+            <form onSubmit={handleAddSubscription} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Basic Information */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-slate-800">Basic Information</h3>
+                  
+                  <div>
+                    <Label htmlFor="name">Subscription Name *</Label>
+                    <Input
+                      id="name"
+                      value={newSubscription.name}
+                      onChange={(e) => setNewSubscription({...newSubscription, name: e.target.value})}
+                      placeholder="e.g., Netflix, Spotify"
+                      required
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="description">Description</Label>
+                    <Input
+                      id="description"
+                      value={newSubscription.description}
+                      onChange={(e) => setNewSubscription({...newSubscription, description: e.target.value})}
+                      placeholder="Brief description of the service"
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="category">Category *</Label>
+                    <Select
+                      value={newSubscription.category}
+                      onValueChange={(value) => setNewSubscription({...newSubscription, category: value})}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="entertainment">Entertainment</SelectItem>
+                        <SelectItem value="productivity">Productivity</SelectItem>
+                        <SelectItem value="software">Software</SelectItem>
+                        <SelectItem value="cloud">Cloud Services</SelectItem>
+                        <SelectItem value="fitness">Fitness & Health</SelectItem>
+                        <SelectItem value="education">Education</SelectItem>
+                        <SelectItem value="news">News & Media</SelectItem>
+                        <SelectItem value="gaming">Gaming</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                
+                {/* Billing Information */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-slate-800">Billing Information</h3>
+                  
+                  <div>
+                    <Label htmlFor="cost">Cost *</Label>
+                    <Input
+                      id="cost"
+                      type="number"
+                      step="0.01"
+                      value={newSubscription.cost}
+                      onChange={(e) => setNewSubscription({...newSubscription, cost: e.target.value})}
+                      placeholder="0.00"
+                      required
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="billing_cycle">Billing Cycle *</Label>
+                    <Select
+                      value={newSubscription.billing_cycle}
+                      onValueChange={(value: 'weekly' | 'monthly' | 'quarterly' | 'yearly' | 'one-time') => 
+                        setNewSubscription({...newSubscription, billing_cycle: value})}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select billing cycle" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="weekly">Weekly</SelectItem>
+                        <SelectItem value="monthly">Monthly</SelectItem>
+                        <SelectItem value="quarterly">Quarterly</SelectItem>
+                        <SelectItem value="yearly">Yearly</SelectItem>
+                        <SelectItem value="one-time">One-time</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="payment_method">Payment Method</Label>
+                    <Input
+                      id="payment_method"
+                      value={newSubscription.payment_method}
+                      onChange={(e) => setNewSubscription({...newSubscription, payment_method: e.target.value})}
+                      placeholder="e.g., Credit Card, PayPal"
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="website_url">Website URL</Label>
+                    <Input
+                      id="website_url"
+                      type="url"
+                      value={newSubscription.website_url}
+                      onChange={(e) => setNewSubscription({...newSubscription, website_url: e.target.value})}
+                      placeholder="https://example.com"
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              {/* Additional Information */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-slate-800">Additional Information</h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="start_date">Start Date</Label>
+                    <Input
+                      id="start_date"
+                      type="date"
+                      value={newSubscription.start_date}
+                      onChange={(e) => setNewSubscription({...newSubscription, start_date: e.target.value})}
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="next_billing_date">Next Billing Date</Label>
+                    <Input
+                      id="next_billing_date"
+                      type="date"
+                      value={newSubscription.next_billing_date}
+                      onChange={(e) => setNewSubscription({...newSubscription, next_billing_date: e.target.value})}
+                    />
+                  </div>
+                </div>
+                
+                <div>
+                  <Label htmlFor="tags">Tags (comma-separated)</Label>
+                  <Input
+                    id="tags"
+                    value={newSubscription.tags}
+                    onChange={(e) => setNewSubscription({...newSubscription, tags: e.target.value})}
+                    placeholder="e.g., streaming, entertainment, family"
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="notes">Notes</Label>
+                  <Input
+                    id="notes"
+                    value={newSubscription.notes}
+                    onChange={(e) => setNewSubscription({...newSubscription, notes: e.target.value})}
+                    placeholder="Additional notes about this subscription"
+                  />
+                </div>
+              </div>
+              
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setShowAddModal(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit">
+                  Add Subscription
+                </Button>
+              </div>
+            </form>
           </div>
         </DialogContent>
       </Dialog>
@@ -658,3 +932,4 @@ export function SubscriptionManager() {
     </div>
   )
 }
+ 

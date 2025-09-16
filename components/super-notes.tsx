@@ -562,7 +562,7 @@ export function SuperNotes() {
           onClick={() => setExpandedNote(null)}
         >
           <div 
-            className="bg-white rounded-xl sm:rounded-2xl shadow-2xl w-full max-w-4xl max-h-[95vh] sm:max-h-[90vh] overflow-hidden"
+            className="bg-white rounded-xl sm:rounded-2xl shadow-2xl w-full max-w-4xl max-h-[95vh] sm:max-h-[90vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             {(() => {
@@ -574,7 +574,7 @@ export function SuperNotes() {
               return (
                 <div className="h-full flex flex-col">
                   {/* Header */}
-                  <div className="mobile-flex-row justify-between mobile-padding border-b border-slate-200">
+                  <div className="mobile-flex-row justify-between mobile-padding border-b border-slate-200 flex-shrink-0">
                     <div className="flex-1 min-w-0">
                       <h2 className="mobile-heading text-slate-800 truncate">{note.title}</h2>
                       <p className="mobile-caption text-slate-600">{note.content}</p>
@@ -600,8 +600,8 @@ export function SuperNotes() {
                   </div>
 
                   {/* Content */}
-                  <div className="flex-1 overflow-y-auto mobile-padding">
-                    <div className="mobile-space-y">
+                  <div className="flex-1 overflow-y-auto mobile-padding min-h-0">
+                    <div className="mobile-space-y pb-4">
                       {/* Tags */}
                       {note.tags.length > 0 && (
                         <div>
