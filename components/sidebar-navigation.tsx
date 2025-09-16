@@ -97,6 +97,12 @@ export function SidebarNavigation({ onClose }: SidebarNavigationProps) {
       href: "/finance"
     },
     {
+      id: "subscriptions",
+      label: "Subscriptions",
+      icon: CreditCard,
+      href: "/subscriptions"
+    },
+    {
       id: "learning",
       label: "Learning",
       icon: BookOpen,
