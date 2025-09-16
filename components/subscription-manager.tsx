@@ -111,7 +111,7 @@ export function SubscriptionManager() {
   const [selectedSubscription, setSelectedSubscription] = useState<Subscription | null>(null)
   const [showDetailsModal, setShowDetailsModal] = useState(false)
   
-  // Add subscription form state
+  // state
   const [newSubscription, setNewSubscription] = useState({
     name: '',
     description: '',
