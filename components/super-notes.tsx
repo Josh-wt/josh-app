@@ -562,7 +562,7 @@ export function SuperNotes() {
           onClick={() => setExpandedNote(null)}
         >
           <div 
-            className="bg-white rounded-xl sm:rounded-2xl shadow-2xl w-full max-w-4xl max-h-[95vh] sm:max-h-[90vh] flex flex-col"
+            className="bg-white rounded-xl sm:rounded-2xl shadow-2xl w-full max-w-4xl h-[95vh] sm:h-[90vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             {(() => {
@@ -601,7 +601,7 @@ export function SuperNotes() {
 
                   {/* Content */}
                   <div className="flex-1 overflow-y-auto mobile-padding min-h-0">
-                    <div className="mobile-space-y pb-4">
+                    <div className="space-y-4 pb-4">
                       {/* Tags */}
                       {note.tags.length > 0 && (
                         <div>
@@ -615,6 +615,17 @@ export function SuperNotes() {
                           </div>
                         </div>
                       )}
+
+                      {/* Test content to make it scrollable */}
+                      <div className="space-y-2">
+                        <h3 className="text-lg font-semibold text-slate-800">Test Content for Scrolling</h3>
+                        {Array.from({ length: 20 }, (_, i) => (
+                          <div key={i} className="p-4 bg-slate-50 rounded-lg">
+                            <h4 className="font-medium text-slate-700">Test Item {i + 1}</h4>
+                            <p className="text-sm text-slate-600">This is test content to make the modal scrollable. Lorem ipsum dolor sit amet, consectetur adipiscing elit.</p>
+                          </div>
+                        ))}
+                      </div>
 
                       {/* Sub-Notes */}
                       <div>
@@ -633,7 +644,7 @@ export function SuperNotes() {
                         </div>
 
                         {note.sub_notes && note.sub_notes.length > 0 ? (
-                          <div className="mobile-space-y">
+                          <div className="space-y-4">
                             {note.sub_notes.map((subNote) => (
                               <div key={subNote.id} className="glass-button p-4 rounded-lg">
                                 <div className="mobile-flex-row justify-between items-start mb-3">
