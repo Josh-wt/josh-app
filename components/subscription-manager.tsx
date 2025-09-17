@@ -148,7 +148,11 @@ export function SubscriptionManager() {
         cost: parseFloat(newSubscription.cost),
         usage_limit: newSubscription.usage_limit ? parseInt(newSubscription.usage_limit) : null,
         tags: newSubscription.tags ? newSubscription.tags.split(',').map(tag => tag.trim()) : [],
-        annual_cost: calculateAnnualCost(parseFloat(newSubscription.cost), newSubscription.billing_cycle)
+        annual_cost: calculateAnnualCost(parseFloat(newSubscription.cost), newSubscription.billing_cycle),
+        // Convert empty date strings to null
+        next_billing_date: newSubscription.next_billing_date || null,
+        end_date: newSubscription.end_date || null,
+        trial_end_date: newSubscription.trial_end_date || null
       }
       
       const { data, error } = await supabase
@@ -288,7 +292,7 @@ export function SubscriptionManager() {
         cancelledThisMonth: transformedSubs.filter(sub => sub.status === 'cancelled' && 
           new Date(sub.updated_at).getMonth() === new Date().getMonth()).length,
         savingsThisMonth: 0, // Could be calculated based on cancelled subscriptions
-        upcomingBills: transformedSubs.filter(sub => sub.status === 'active' && 
+        upcomingBills: transformedSubs.filter(sub => sub.status === 'active' && sub.next_billing_date &&
           new Date(sub.next_billing_date) <= new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)).length,
         categoryBreakdown,
         spendingTrend: [], // Could be calculated from historical data
@@ -328,6 +332,9 @@ export function SubscriptionManager() {
         case "cost":
           return b.cost - a.cost
         case "nextBilling":
+          if (!a.next_billing_date && !b.next_billing_date) return 0
+          if (!a.next_billing_date) return 1
+          if (!b.next_billing_date) return -1
           return new Date(a.next_billing_date).getTime() - new Date(b.next_billing_date).getTime()
         case "category":
           return a.category.localeCompare(b.category)
@@ -360,7 +367,8 @@ export function SubscriptionManager() {
     }).format(amount)
   }
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return 'Not set'
     return new Date(dateString).toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
@@ -368,7 +376,8 @@ export function SubscriptionManager() {
     })
   }
 
-  const getDaysUntilBilling = (dateString: string) => {
+  const getDaysUntilBilling = (dateString: string | null) => {
+    if (!dateString) return 0
     const today = new Date()
     const billingDate = new Date(dateString)
     const diffTime = billingDate.getTime() - today.getTime()
