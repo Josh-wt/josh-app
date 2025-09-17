@@ -108,8 +108,12 @@ export function SubscriptionManager() {
   const [sortBy, setSortBy] = useState<string>("name")
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
   const [showAddModal, setShowAddModal] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
   const [selectedSubscription, setSelectedSubscription] = useState<Subscription | null>(null)
   const [showDetailsModal, setShowDetailsModal] = useState(false)
+  const [editingSubscription, setEditingSubscription] = useState<Subscription | null>(null)
+  const [reminders, setReminders] = useState<any[]>([])
+  const [showReminders, setShowReminders] = useState(false)
   
   // state
   const [newSubscription, setNewSubscription] = useState({
@@ -198,6 +202,154 @@ export function SubscriptionManager() {
     } catch (error) {
       console.error('Error adding subscription:', error)
     }
+  }
+
+  // Edit subscription function
+  const handleEditSubscription = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingSubscription) return
+    
+    try {
+      const subscriptionData = {
+        ...editingSubscription,
+        cost: parseFloat(editingSubscription.cost.toString()),
+        usage_limit: editingSubscription.usage_limit ? parseInt(editingSubscription.usage_limit.toString()) : null,
+        tags: Array.isArray(editingSubscription.tags) ? editingSubscription.tags : 
+              (editingSubscription.tags ? (editingSubscription.tags as string).split(',').map((tag: string) => tag.trim()) : []),
+        annual_cost: calculateAnnualCost(parseFloat(editingSubscription.cost.toString()), editingSubscription.billing_cycle),
+        // Convert empty date strings to null
+        next_billing_date: editingSubscription.next_billing_date || null,
+        end_date: editingSubscription.end_date || null,
+        trial_end_date: editingSubscription.trial_end_date || null
+      }
+      
+      const { data, error } = await supabase
+        .from('subscriptions')
+        .update(subscriptionData)
+        .eq('id', editingSubscription.id)
+        .select()
+      
+      if (error) {
+        console.error('Error updating subscription:', error)
+        return
+      }
+      
+      // Refresh the subscriptions list
+      await fetchSubscriptions()
+      
+      // Close modal and reset
+      setEditingSubscription(null)
+      setShowEditModal(false)
+    } catch (error) {
+      console.error('Error updating subscription:', error)
+    }
+  }
+
+  // Delete subscription function
+  const handleDeleteSubscription = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this subscription?')) return
+    
+    try {
+      const { error } = await supabase
+        .from('subscriptions')
+        .delete()
+        .eq('id', id)
+      
+      if (error) {
+        console.error('Error deleting subscription:', error)
+        return
+      }
+      
+      // Refresh the subscriptions list
+      await fetchSubscriptions()
+    } catch (error) {
+      console.error('Error deleting subscription:', error)
+    }
+  }
+
+  // Enhanced billing cycle calculations
+  const calculateNextBillingDate = (startDate: string, billingCycle: string, currentNextBilling?: string) => {
+    const start = new Date(startDate)
+    const now = new Date()
+    
+    if (currentNextBilling && new Date(currentNextBilling) > now) {
+      return currentNextBilling
+    }
+    
+    let nextBilling = new Date(start)
+    
+    switch (billingCycle) {
+      case 'weekly':
+        while (nextBilling <= now) {
+          nextBilling.setDate(nextBilling.getDate() + 7)
+        }
+        break
+      case 'monthly':
+        while (nextBilling <= now) {
+          nextBilling.setMonth(nextBilling.getMonth() + 1)
+        }
+        break
+      case 'quarterly':
+        while (nextBilling <= now) {
+          nextBilling.setMonth(nextBilling.getMonth() + 3)
+        }
+        break
+      case 'yearly':
+        while (nextBilling <= now) {
+          nextBilling.setFullYear(nextBilling.getFullYear() + 1)
+        }
+        break
+      case 'one-time':
+        return null
+    }
+    
+    return nextBilling.toISOString().split('T')[0]
+  }
+
+  // Generate reminders based on subscription data
+  const generateReminders = () => {
+    const today = new Date()
+    const reminders: any[] = []
+    
+    subscriptions.forEach(sub => {
+      if (sub.status === 'active' && sub.next_billing_date) {
+        const billingDate = new Date(sub.next_billing_date)
+        const daysUntil = Math.ceil((billingDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+        
+        // Check if reminder should be shown based on reminder_days
+        if (sub.reminder_days && sub.reminder_days.includes(daysUntil)) {
+          reminders.push({
+            id: `billing-${sub.id}`,
+            type: 'billing',
+            title: `${sub.name} billing due`,
+            message: `Your ${sub.name} subscription will be billed ${formatCurrency(sub.cost)} in ${daysUntil} day${daysUntil !== 1 ? 's' : ''}`,
+            date: sub.next_billing_date,
+            subscription: sub,
+            priority: daysUntil <= 1 ? 'high' : daysUntil <= 3 ? 'medium' : 'low'
+          })
+        }
+        
+        // Check for trial ending
+        if ((sub.status as any) === 'trial' && sub.trial_end_date) {
+          const trialEnd = new Date(sub.trial_end_date)
+          const daysUntilTrialEnd = Math.ceil((trialEnd.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+          
+          if (daysUntilTrialEnd <= 3 && daysUntilTrialEnd >= 0) {
+            reminders.push({
+              id: `trial-${sub.id}`,
+              type: 'trial',
+              title: `${sub.name} trial ending`,
+              message: `Your ${sub.name} trial ends in ${daysUntilTrialEnd} day${daysUntilTrialEnd !== 1 ? 's' : ''}`,
+              date: sub.trial_end_date,
+              subscription: sub,
+              priority: 'high'
+            })
+          }
+        }
+      }
+    })
+    
+    return reminders.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
   }
   
   // Helper function to calculate annual cost
@@ -310,6 +462,13 @@ export function SubscriptionManager() {
   useEffect(() => {
     fetchSubscriptions()
   }, [])
+
+  // Update reminders when subscriptions change
+  useEffect(() => {
+    if (subscriptions.length > 0) {
+      setReminders(generateReminders())
+    }
+  }, [subscriptions])
 
   // Filtered and sorted subscriptions
   const filteredSubscriptions = useMemo(() => {
@@ -489,6 +648,71 @@ export function SubscriptionManager() {
         </div>
       </GlassCard>
 
+      {/* Reminders Section */}
+      {reminders.length > 0 && (
+        <GlassCard className="p-4 sm:p-6 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-red-100 rounded-lg flex items-center justify-center">
+                <Bell className="w-4 h-4 sm:w-5 sm:h-5 text-red-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-slate-800">Reminders</h3>
+                <p className="text-sm text-slate-600">Upcoming bills and trial endings</p>
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowReminders(!showReminders)}
+              className="glass-button"
+            >
+              {showReminders ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </Button>
+          </div>
+          
+          {showReminders && (
+            <div className="space-y-3">
+              {reminders.map((reminder) => (
+                <div
+                  key={reminder.id}
+                  className={`p-4 rounded-lg border-l-4 ${
+                    reminder.priority === 'high' 
+                      ? 'bg-red-50 border-red-400' 
+                      : reminder.priority === 'medium'
+                      ? 'bg-orange-50 border-orange-400'
+                      : 'bg-blue-50 border-blue-400'
+                  }`}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <h4 className="font-medium text-slate-800">{reminder.title}</h4>
+                      <p className="text-sm text-slate-600 mt-1">{reminder.message}</p>
+                      <p className="text-xs text-slate-500 mt-2">
+                        Due: {formatDate(reminder.date)}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 ml-4">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="glass-button"
+                        onClick={() => {
+                          setEditingSubscription(reminder.subscription)
+                          setShowEditModal(true)
+                        }}
+                      >
+                        <Edit className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </GlassCard>
+      )}
+
       {/* Filters and Search */}
       <GlassCard className="p-4 sm:p-6 flex flex-col sm:flex-row items-center gap-4">
         <div className="flex-1 w-full">
@@ -650,7 +874,8 @@ export function SubscriptionManager() {
                     variant="outline"
                     className="glass-button"
                     onClick={() => {
-                      // Handle edit
+                      setEditingSubscription(sub)
+                      setShowEditModal(true)
                     }}
                   >
                     <Edit className="w-4 h-4" />
@@ -719,7 +944,8 @@ export function SubscriptionManager() {
                       variant="outline"
                       className="glass-button"
                       onClick={() => {
-                        // Handle edit
+                        setEditingSubscription(sub)
+                        setShowEditModal(true)
                       }}
                     >
                       <Edit className="w-4 h-4" />
@@ -916,6 +1142,201 @@ export function SubscriptionManager() {
                 </Button>
               </div>
             </form>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Subscription Modal */}
+      <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Edit Subscription</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {editingSubscription && (
+              <form onSubmit={handleEditSubscription} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Basic Information */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold text-slate-800">Basic Information</h3>
+                    
+                    <div>
+                      <Label htmlFor="edit_name">Subscription Name *</Label>
+                      <Input
+                        id="edit_name"
+                        value={editingSubscription.name}
+                        onChange={(e) => setEditingSubscription({...editingSubscription, name: e.target.value})}
+                        placeholder="e.g., Netflix, Spotify"
+                        required
+                      />
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="edit_description">Description</Label>
+                      <Input
+                        id="edit_description"
+                        value={editingSubscription.description || ''}
+                        onChange={(e) => setEditingSubscription({...editingSubscription, description: e.target.value})}
+                        placeholder="Brief description"
+                      />
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="edit_cost">Cost *</Label>
+                      <Input
+                        id="edit_cost"
+                        type="number"
+                        step="0.01"
+                        value={editingSubscription.cost}
+                        onChange={(e) => setEditingSubscription({...editingSubscription, cost: parseFloat(e.target.value)})}
+                        placeholder="0.00"
+                        required
+                      />
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="edit_billing_cycle">Billing Cycle *</Label>
+                      <Select
+                        value={editingSubscription.billing_cycle}
+                        onValueChange={(value: any) => setEditingSubscription({...editingSubscription, billing_cycle: value})}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="weekly">Weekly</SelectItem>
+                          <SelectItem value="monthly">Monthly</SelectItem>
+                          <SelectItem value="quarterly">Quarterly</SelectItem>
+                          <SelectItem value="yearly">Yearly</SelectItem>
+                          <SelectItem value="one-time">One-time</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  
+                  {/* Additional Information */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold text-slate-800">Additional Information</h3>
+                    
+                    <div>
+                      <Label htmlFor="edit_category">Category</Label>
+                      <Select
+                        value={editingSubscription.category}
+                        onValueChange={(value) => setEditingSubscription({...editingSubscription, category: value})}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="entertainment">Entertainment</SelectItem>
+                          <SelectItem value="productivity">Productivity</SelectItem>
+                          <SelectItem value="development">Development</SelectItem>
+                          <SelectItem value="music">Music</SelectItem>
+                          <SelectItem value="design">Design</SelectItem>
+                          <SelectItem value="gaming">Gaming</SelectItem>
+                          <SelectItem value="education">Education</SelectItem>
+                          <SelectItem value="photography">Photography</SelectItem>
+                          <SelectItem value="cloud">Cloud</SelectItem>
+                          <SelectItem value="security">Security</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="edit_payment_method">Payment Method</Label>
+                      <Input
+                        id="edit_payment_method"
+                        value={editingSubscription.payment_method || ''}
+                        onChange={(e) => setEditingSubscription({...editingSubscription, payment_method: e.target.value})}
+                        placeholder="e.g., Credit Card, PayPal"
+                      />
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="edit_website_url">Website URL</Label>
+                      <Input
+                        id="edit_website_url"
+                        type="url"
+                        value={editingSubscription.website_url || ''}
+                        onChange={(e) => setEditingSubscription({...editingSubscription, website_url: e.target.value})}
+                        placeholder="https://example.com"
+                      />
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="edit_status">Status</Label>
+                      <Select
+                        value={editingSubscription.status}
+                        onValueChange={(value: any) => setEditingSubscription({...editingSubscription, status: value})}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="active">Active</SelectItem>
+                          <SelectItem value="paused">Paused</SelectItem>
+                          <SelectItem value="cancelled">Cancelled</SelectItem>
+                          <SelectItem value="trial">Trial</SelectItem>
+                          <SelectItem value="expired">Expired</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="edit_start_date">Start Date</Label>
+                    <Input
+                      id="edit_start_date"
+                      type="date"
+                      value={editingSubscription.start_date}
+                      onChange={(e) => setEditingSubscription({...editingSubscription, start_date: e.target.value})}
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="edit_next_billing_date">Next Billing Date</Label>
+                    <Input
+                      id="edit_next_billing_date"
+                      type="date"
+                      value={editingSubscription.next_billing_date || ''}
+                      onChange={(e) => setEditingSubscription({...editingSubscription, next_billing_date: e.target.value})}
+                    />
+                  </div>
+                </div>
+                
+                <div>
+                  <Label htmlFor="edit_tags">Tags (comma-separated)</Label>
+                  <Input
+                    id="edit_tags"
+                    value={Array.isArray(editingSubscription.tags) ? editingSubscription.tags.join(', ') : (editingSubscription.tags || '')}
+                    onChange={(e) => setEditingSubscription({...editingSubscription, tags: e.target.value as any})}
+                    placeholder="e.g., streaming, entertainment, family"
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="edit_notes">Notes</Label>
+                  <Input
+                    id="edit_notes"
+                    value={editingSubscription.notes || ''}
+                    onChange={(e) => setEditingSubscription({...editingSubscription, notes: e.target.value})}
+                    placeholder="Additional notes about this subscription"
+                  />
+                </div>
+                
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => setShowEditModal(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="submit">
+                    Update Subscription
+                  </Button>
+                </div>
+              </form>
+            )}
           </div>
         </DialogContent>
       </Dialog>
