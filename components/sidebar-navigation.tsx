@@ -26,7 +26,8 @@ import {
   Megaphone,
   TrendingUp,
   Settings,
-  X
+  X,
+  Utensils
 } from "lucide-react"
 
 interface NavItem {
@@ -89,6 +90,12 @@ export function SidebarNavigation({ onClose }: SidebarNavigationProps) {
       label: "Habits",
       icon: Target,
       href: "/habits"
+    },
+    {
+      id: "meals",
+      label: "Meals & Nutrition",
+      icon: Utensils,
+      href: "/meals"
     },
     {
       id: "finance",
