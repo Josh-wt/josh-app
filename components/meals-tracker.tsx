@@ -200,6 +200,8 @@ export function MealsTracker() {
       setMeals(data || [])
     } catch (error) {
       console.error("Error fetching meals:", error)
+    } finally {
+      setLoading(false)
     }
   }
 
