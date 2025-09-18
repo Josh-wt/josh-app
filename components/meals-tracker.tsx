@@ -26,10 +26,17 @@ import {
   Flame,
   Zap,
   Heart,
-  Activity
+  Activity,
+  Camera,
+  Upload,
+  Wand2,
+  BarChart3,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
+import { aiFoodService } from "@/lib/ai-food-service"
 
 interface Meal {
   id: string
@@ -133,6 +140,11 @@ export function MealsTracker() {
   const [user, setUser] = useState<any>(null)
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
   const [activeView, setActiveView] = useState<"today" | "week" | "all">("today")
+  const [weekStartDate, setWeekStartDate] = useState(() => {
+    const today = new Date()
+    const startOfWeek = new Date(today.setDate(today.getDate() - today.getDay()))
+    return startOfWeek.toISOString().split('T')[0]
+  })
   const [searchQuery, setSearchQuery] = useState("")
   const [showAddForm, setShowAddForm] = useState(false)
   const [editingMeal, setEditingMeal] = useState<Meal | null>(null)
@@ -147,6 +159,12 @@ export function MealsTracker() {
     meal_type: "breakfast" as Meal["meal_type"],
     time: new Date().toTimeString().slice(0, 5),
   })
+  const [showAIModal, setShowAIModal] = useState(false)
+  const [aiDescription, setAiDescription] = useState("")
+  const [aiImageFile, setAiImageFile] = useState<File | null>(null)
+  const [aiProcessing, setAiProcessing] = useState(false)
+  const [weeklyMeals, setWeeklyMeals] = useState<Meal[]>([])
+  const [weeklyStats, setWeeklyStats] = useState<any>(null)
   const [nutritionGoals, setNutritionGoals] = useState<NutritionGoals | null>(null)
   const [waterIntake, setWaterIntake] = useState(0)
   const [todayStats, setTodayStats] = useState({
@@ -173,7 +191,8 @@ export function MealsTracker() {
           fetchNutritionGoals(user),
           fetchWaterIntake(user),
           calculateTodayStats(user),
-          fetchFoodDatabase()
+          fetchFoodDatabase(),
+          fetchWeeklyMeals(user)
         ])
       } else {
         setLoading(false)
@@ -181,6 +200,13 @@ export function MealsTracker() {
     }
     getUser()
   }, [])
+
+  // Refetch weekly meals when week changes
+  useEffect(() => {
+    if (user && activeView === "week") {
+      fetchWeeklyMeals()
+    }
+  }, [weekStartDate, user, activeView])
 
   const fetchMeals = async (currentUser = user) => {
     if (!currentUser) return
@@ -295,6 +321,86 @@ export function MealsTracker() {
       setFoodDatabase(data || [])
     } catch (error) {
       console.error("Error fetching food database:", error)
+    }
+  }
+
+  const fetchWeeklyMeals = async (currentUser = user) => {
+    if (!currentUser) return
+
+    try {
+      const endDate = new Date(weekStartDate)
+      endDate.setDate(endDate.getDate() + 6)
+      const endDateStr = endDate.toISOString().split('T')[0]
+
+      const { data, error } = await supabase
+        .from("meals")
+        .select(`
+          *,
+          food_items (*)
+        `)
+        .eq("user_id", currentUser.id)
+        .gte("date", weekStartDate)
+        .lte("date", endDateStr)
+        .order("date", { ascending: true })
+        .order("time", { ascending: true })
+
+      if (error) throw error
+      setWeeklyMeals(data || [])
+    } catch (error) {
+      console.error("Error fetching weekly meals:", error)
+    }
+  }
+
+  const processWithAI = async () => {
+    if (!aiDescription.trim() && !aiImageFile) return
+
+    setAiProcessing(true)
+    try {
+      let parsedMeal
+      
+      if (aiImageFile) {
+        parsedMeal = await aiFoodService.analyzeFoodImage(aiImageFile)
+      } else {
+        parsedMeal = await aiFoodService.parseFoodDescription(aiDescription)
+      }
+
+      // Convert AI response to our food items format
+      const aiFoodItems: FoodItem[] = parsedMeal.foods.map((food, index) => ({
+        id: `ai-${Date.now()}-${index}`,
+        meal_id: "",
+        name: food.name,
+        brand: undefined,
+        quantity: food.quantity,
+        unit: food.unit,
+        calories_per_unit: food.calories_per_unit,
+        protein_per_unit: food.protein_per_unit,
+        carbs_per_unit: food.carbs_per_unit,
+        fat_per_unit: food.fat_per_unit,
+        fiber_per_unit: food.fiber_per_unit,
+        sugar_per_unit: food.sugar_per_unit,
+        sodium_per_unit: food.sodium_per_unit,
+        created_at: new Date().toISOString(),
+      }))
+
+      // Set the form data with AI results
+      setFormData(prev => ({
+        ...prev,
+        name: aiImageFile ? "AI Analyzed Meal" : "AI Parsed Meal",
+        meal_type: parsedMeal.meal_type,
+      }))
+
+      setSelectedMealType(parsedMeal.meal_type)
+      setSelectedFoods(aiFoodItems)
+      setShowAIModal(false)
+      setAiDescription("")
+      setAiImageFile(null)
+      setShowAddForm(true)
+
+    } catch (error) {
+      console.error("Error processing with AI:", error)
+      alert(`AI processing failed: ${error instanceof Error ? error.message : "Unknown error"}`)
+    } finally {
+      setAiProcessing(false)
     }
   }
 
@@ -476,6 +582,71 @@ export function MealsTracker() {
     ))
   }
 
+  const getWeeklyStats = () => {
+    const dailyStats: Record<string, {
+      date: string
+      calories: number
+      protein: number
+      carbs: number
+      fat: number
+      fiber: number
+      sugar: number
+      sodium: number
+      mealCount: number
+    }> = {}
+    
+    // Group meals by date
+    weeklyMeals.forEach(meal => {
+      if (!dailyStats[meal.date]) {
+        dailyStats[meal.date] = {
+          date: meal.date,
+          calories: 0,
+          protein: 0,
+          carbs: 0,
+          fat: 0,
+          fiber: 0,
+          sugar: 0,
+          sodium: 0,
+          mealCount: 0
+        }
+      }
+      
+      dailyStats[meal.date].calories += meal.total_calories
+      dailyStats[meal.date].protein += meal.total_protein
+      dailyStats[meal.date].carbs += meal.total_carbs
+      dailyStats[meal.date].fat += meal.total_fat
+      dailyStats[meal.date].fiber += meal.total_fiber
+      dailyStats[meal.date].sugar += meal.total_sugar
+      dailyStats[meal.date].sodium += meal.total_sodium
+      dailyStats[meal.date].mealCount += 1
+    })
+
+    return Object.values(dailyStats)
+  }
+
+  const getWeekDates = () => {
+    const dates = []
+    const startDate = new Date(weekStartDate)
+    
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(startDate)
+      date.setDate(startDate.getDate() + i)
+      dates.push(date.toISOString().split('T')[0])
+    }
+    
+    return dates
+  }
+
+  const navigateWeek = (direction: 'prev' | 'next') => {
+    const currentWeek = new Date(weekStartDate)
+    if (direction === 'prev') {
+      currentWeek.setDate(currentWeek.getDate() - 7)
+    } else {
+      currentWeek.setDate(currentWeek.getDate() + 7)
+    }
+    setWeekStartDate(currentWeek.toISOString().split('T')[0])
+  }
+
   if (!user) {
     return (
       <div className="space-y-6">
@@ -586,32 +757,196 @@ export function MealsTracker() {
         </div>
       </GlassCard>
 
-      {/* Search and Filters */}
-      <GlassCard className="p-4">
-        <div className="flex flex-wrap items-center gap-4 mb-4">
-          <div className="flex items-center gap-2 glass-button px-3 py-2 rounded-lg flex-1 min-w-0">
-            <Search className="w-4 h-4 text-slate-500" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search meals..."
-              className="bg-transparent border-none outline-none text-sm flex-1 min-w-0"
-            />
+        {/* View Switcher */}
+        <GlassCard className="p-4">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              {[
+                { key: "today", label: "Today", icon: Calendar },
+                { key: "week", label: "Week", icon: BarChart3 },
+                { key: "all", label: "All", icon: Filter },
+              ].map(({ key, label, icon: Icon }) => (
+                <button
+                  key={key}
+                  onClick={() => setActiveView(key as any)}
+                  className={cn(
+                    "glass-button px-4 py-2 rounded-lg flex items-center gap-2 text-sm transition-all",
+                    activeView === key && "glass-active",
+                  )}
+                >
+                  <Icon className="w-4 h-4" />
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            <button
+              onClick={() => setShowAIModal(true)}
+              className="glass-button px-4 py-2 rounded-lg flex items-center gap-2 hover:scale-105 transition-all bg-gradient-to-r from-purple-500 to-pink-500 text-white"
+            >
+              <Wand2 className="w-4 h-4" />
+              AI Analyze
+            </button>
           </div>
 
-          <button
-            onClick={() => setShowAddForm(true)}
-            className="glass-button px-4 py-2 rounded-lg flex items-center gap-2 hover:scale-105 transition-all bg-gradient-to-r from-cyan-500 to-blue-500 text-white"
-          >
-            <Plus className="w-4 h-4" />
-            Add Meal
-          </button>
-        </div>
-      </GlassCard>
+          {/* Search and Add Meal */}
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="flex items-center gap-2 glass-button px-3 py-2 rounded-lg flex-1 min-w-0">
+              <Search className="w-4 h-4 text-slate-500" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search meals..."
+                className="bg-transparent border-none outline-none text-sm flex-1 min-w-0"
+              />
+            </div>
 
-      {/* Meals by Type */}
-      <div className="space-y-6">
+            <button
+              onClick={() => setShowAddForm(true)}
+              className="glass-button px-4 py-2 rounded-lg flex items-center gap-2 hover:scale-105 transition-all bg-gradient-to-r from-cyan-500 to-blue-500 text-white"
+            >
+              <Plus className="w-4 h-4" />
+              Add Meal
+            </button>
+          </div>
+        </GlassCard>
+
+      {/* Weekly Timeline View */}
+      {activeView === "week" && (
+        <div className="space-y-6">
+          {/* Week Navigation */}
+          <GlassCard className="p-4">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => navigateWeek('prev')}
+                  className="glass-button p-2 rounded-lg hover:scale-105 transition-all"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
+                
+                <h3 className="text-lg font-semibold text-slate-800">
+                  Week of {new Date(weekStartDate).toLocaleDateString('en-US', { 
+                    month: 'short', 
+                    day: 'numeric',
+                    year: 'numeric'
+                  })}
+                </h3>
+                
+                <button
+                  onClick={() => navigateWeek('next')}
+                  className="glass-button p-2 rounded-lg hover:scale-105 transition-all"
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+              </div>
+
+              <button
+                onClick={() => fetchWeeklyMeals()}
+                className="glass-button px-3 py-2 rounded-lg text-sm"
+              >
+                Refresh
+              </button>
+            </div>
+
+            {/* Weekly Stats Grid */}
+            <div className="grid grid-cols-7 gap-2 mb-4">
+              {getWeekDates().map((date, index) => {
+                const dayStats = getWeeklyStats().find((stat: any) => stat.date === date)
+                const dayName = new Date(date).toLocaleDateString('en-US', { weekday: 'short' })
+                const dayNumber = new Date(date).getDate()
+                const isToday = date === new Date().toISOString().split('T')[0]
+                
+                return (
+                  <div 
+                    key={date}
+                    className={cn(
+                      "glass-button p-3 rounded-lg text-center transition-all hover:scale-105",
+                      isToday && "ring-2 ring-cyan-500 bg-cyan-50"
+                    )}
+                  >
+                    <div className="text-xs text-slate-600 mb-1">{dayName}</div>
+                    <div className={cn("text-lg font-bold mb-1", isToday ? "text-cyan-700" : "text-slate-800")}>
+                      {dayNumber}
+                    </div>
+                    <div className="text-xs text-slate-600">
+                      {dayStats?.calories || 0} cal
+                    </div>
+                    <div className="text-xs text-slate-500">
+                      {dayStats?.mealCount || 0} meals
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Weekly Nutrition Chart */}
+            <div className="space-y-3">
+              <h4 className="font-medium text-slate-700">Weekly Nutrition Trends</h4>
+              {getWeeklyStats().map((dayStat: any) => (
+                <div key={dayStat.date} className="glass-button p-4 rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="font-medium text-slate-800">
+                      {new Date(dayStat.date).toLocaleDateString('en-US', { 
+                        weekday: 'long',
+                        month: 'short',
+                        day: 'numeric'
+                      })}
+                    </div>
+                    <div className="text-sm text-slate-600">
+                      {dayStat.mealCount} meals
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-4 gap-4 text-sm">
+                    <div className="text-center">
+                      <div className="font-medium text-orange-600">{Math.round(dayStat.calories)}</div>
+                      <div className="text-xs text-slate-500">calories</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="font-medium text-blue-600">{Math.round(dayStat.protein)}g</div>
+                      <div className="text-xs text-slate-500">protein</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="font-medium text-green-600">{Math.round(dayStat.carbs)}g</div>
+                      <div className="text-xs text-slate-500">carbs</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="font-medium text-red-600">{Math.round(dayStat.fat)}g</div>
+                      <div className="text-xs text-slate-500">fat</div>
+                    </div>
+                  </div>
+
+                  {/* Daily meals list */}
+                  {weeklyMeals.filter(meal => meal.date === dayStat.date).length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-slate-200">
+                      <div className="space-y-2">
+                        {weeklyMeals
+                          .filter(meal => meal.date === dayStat.date)
+                          .map((meal) => {
+                            const Icon = mealTypeIcons[meal.meal_type]
+                            return (
+                              <div key={meal.id} className="flex items-center gap-3 text-sm">
+                                <Icon className="w-4 h-4 text-slate-500" />
+                                <span className="flex-1 text-slate-700">{meal.name}</span>
+                                <span className="text-slate-500">{meal.total_calories} cal</span>
+                              </div>
+                            )
+                          })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </GlassCard>
+        </div>
+      )}
+
+      {/* Meals by Type - Today View */}
+      {activeView === "today" && (
+        <div className="space-y-6">
         {Object.entries(mealsByType).map(([mealType, meals]) => {
           const Icon = mealTypeIcons[mealType as keyof typeof mealTypeIcons]
           const colorClass = mealTypeColors[mealType as keyof typeof mealTypeColors]
@@ -722,7 +1057,8 @@ export function MealsTracker() {
             </div>
           )
         })}
-      </div>
+        </div>
+      )}
 
       {/* Smart Suggestions */}
       <GlassCard className="p-4 bg-gradient-to-r from-amber-50 to-orange-50 border-amber-200/30">
@@ -987,6 +1323,147 @@ export function MealsTracker() {
                   >
                     Done
                   </button>
+                </div>
+              </div>
+            </div>
+          </GlassCard>
+        </div>
+      )}
+
+      {/* AI Analysis Modal */}
+      {showAIModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <GlassCard className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-semibold text-slate-800">AI Food Analysis</h3>
+                <button
+                  onClick={() => {
+                    setShowAIModal(false)
+                    setAiDescription("")
+                    setAiImageFile(null)
+                  }}
+                  className="glass-button p-2 rounded-lg hover:scale-105 transition-all"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-6">
+                {/* Description Input */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Describe your food
+                  </label>
+                  <textarea
+                    value={aiDescription}
+                    onChange={(e) => setAiDescription(e.target.value)}
+                    placeholder="e.g., I had a grilled chicken salad with tomatoes, cucumbers, and olive oil dressing for lunch"
+                    rows={4}
+                    className="w-full glass-button p-3 rounded-lg resize-none"
+                    disabled={aiProcessing}
+                  />
+                  <p className="text-xs text-slate-500 mt-1">
+                    Describe what you ate, including quantities and preparation methods for better accuracy.
+                  </p>
+                </div>
+
+                {/* Image Upload */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Or upload a photo of your food
+                  </label>
+                  <div className="glass-button p-6 rounded-lg border-2 border-dashed border-slate-300 text-center hover:border-cyan-400 transition-colors">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => setAiImageFile(e.target.files?.[0] || null)}
+                      className="hidden"
+                      id="food-image-upload"
+                      disabled={aiProcessing}
+                    />
+                    <label
+                      htmlFor="food-image-upload"
+                      className="cursor-pointer flex flex-col items-center gap-2"
+                    >
+                      {aiImageFile ? (
+                        <>
+                          <Camera className="w-8 h-8 text-green-500" />
+                          <span className="text-sm text-green-600 font-medium">
+                            {aiImageFile.name}
+                          </span>
+                          <span className="text-xs text-slate-500">
+                            Click to change image
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="w-8 h-8 text-slate-400" />
+                          <span className="text-sm text-slate-600">
+                            Click to upload food photo
+                          </span>
+                          <span className="text-xs text-slate-500">
+                            Supports JPG, PNG, WebP
+                          </span>
+                        </>
+                      )}
+                    </label>
+                  </div>
+                </div>
+
+                {/* AI Processing Status */}
+                {aiProcessing && (
+                  <div className="glass-button p-4 rounded-lg bg-gradient-to-r from-purple-50 to-pink-50 border-purple-200/30">
+                    <div className="flex items-center gap-3">
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-purple-600"></div>
+                      <span className="text-purple-700 font-medium">
+                        AI is analyzing your food...
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                <div className="flex items-center gap-3 pt-4 border-t border-slate-200">
+                  <button
+                    onClick={processWithAI}
+                    disabled={(!aiDescription.trim() && !aiImageFile) || aiProcessing}
+                    className="glass-button px-6 py-3 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    {aiProcessing ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        <Wand2 className="w-4 h-4" />
+                        Analyze with AI
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowAIModal(false)
+                      setAiDescription("")
+                      setAiImageFile(null)
+                    }}
+                    className="glass-button px-6 py-3 rounded-lg"
+                  >
+                    Cancel
+                  </button>
+                </div>
+
+                {/* AI Features Info */}
+                <div className="glass-button p-4 rounded-lg bg-gradient-to-r from-blue-50 to-cyan-50 border-blue-200/30">
+                  <h4 className="font-medium text-blue-800 mb-2">AI Features</h4>
+                  <ul className="text-sm text-blue-700 space-y-1">
+                    <li>• Automatically identifies food items and quantities</li>
+                    <li>• Calculates accurate nutrition information</li>
+                    <li>• Determines meal type (breakfast, lunch, dinner, snack)</li>
+                    <li>• Works with both text descriptions and food photos</li>
+                    <li>• Powered by advanced QWEN AI models</li>
+                  </ul>
                 </div>
               </div>
             </div>
