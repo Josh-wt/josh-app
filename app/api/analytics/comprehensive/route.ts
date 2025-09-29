@@ -75,8 +75,8 @@ async function getEvaluationMetrics(supabase: any) {
     .from('assessment_evaluations')
     .select('user_id')
   
-  const userCounts = userEvalCounts?.reduce((acc: any, eval: any) => {
-    acc[eval.user_id] = (acc[eval.user_id] || 0) + 1
+  const userCounts = userEvalCounts?.reduce((acc: any, evaluation: any) => {
+    acc[evaluation.user_id] = (acc[evaluation.user_id] || 0) + 1
     return acc
   }, {}) || {}
   
@@ -155,10 +155,10 @@ async function getEngagementMetrics(supabase: any) {
     .from('study_streaks')
     .select('streak_count, longest_streak')
   
-  const activeStreaks = streaks?.filter(s => s.streak_count > 0).length || 0
-  const maxStreak = Math.max(...(streaks?.map(s => s.longest_streak) || [0]), 0)
+  const activeStreaks = streaks?.filter((s: any) => s.streak_count > 0).length || 0
+  const maxStreak = Math.max(...(streaks?.map((s: any) => s.longest_streak) || [0]), 0)
   const avgStreak = streaks?.length > 0 ? 
-    streaks.reduce((sum, s) => sum + s.streak_count, 0) / streaks.length : 0
+    streaks.reduce((sum: any, s: any) => sum + s.streak_count, 0) / streaks.length : 0
   
   // Saved resources
   const { data: savedResources } = await supabase
@@ -169,7 +169,7 @@ async function getEngagementMetrics(supabase: any) {
     .from('saved_resources')
     .select('user_id')
   
-  const uniqueUsersWithResources = new Set(usersWithResources?.map(r => r.user_id) || []).size
+  const uniqueUsersWithResources = new Set(usersWithResources?.map((r: any) => r.user_id) || []).size
   
   // Study goals
   const { data: goals } = await supabase
@@ -177,7 +177,7 @@ async function getEngagementMetrics(supabase: any) {
     .select('completed')
   
   const totalGoals = goals?.length || 0
-  const completedGoals = goals?.filter(g => g.completed).length || 0
+  const completedGoals = goals?.filter((g: any) => g.completed).length || 0
   const goalCompletionRate = totalGoals > 0 ? (completedGoals / totalGoals) * 100 : 0
   
   return {
@@ -199,7 +199,7 @@ async function getPerformanceMetrics(supabase: any) {
     .select('accurate')
   
   const totalFeedback = feedback?.length || 0
-  const positiveFeedback = feedback?.filter(f => f.accurate).length || 0
+  const positiveFeedback = feedback?.filter((f: any) => f.accurate).length || 0
   const feedbackQuality = totalFeedback > 0 ? (positiveFeedback / totalFeedback) * 100 : 0
   
   // Subscription metrics
@@ -208,7 +208,7 @@ async function getPerformanceMetrics(supabase: any) {
     .select('status')
   
   const totalSubscriptions = subscriptions?.length || 0
-  const activeSubscriptions = subscriptions?.filter(s => s.status === 'active').length || 0
+  const activeSubscriptions = subscriptions?.filter((s: any) => s.status === 'active').length || 0
   const conversionRate = totalSubscriptions > 0 ? (activeSubscriptions / totalSubscriptions) * 100 : 0
   
   // Retention rate (users who did evaluations in last 7 days vs last 30 days)
@@ -222,8 +222,8 @@ async function getPerformanceMetrics(supabase: any) {
     .select('user_id')
     .gte('timestamp', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
   
-  const recentUserSet = new Set(recentUsers?.map(u => u.user_id) || [])
-  const monthlyUserSet = new Set(monthlyUsers?.map(u => u.user_id) || [])
+  const recentUserSet = new Set(recentUsers?.map((u: any) => u.user_id) || [])
+  const monthlyUserSet = new Set(monthlyUsers?.map((u: any) => u.user_id) || [])
   const retentionRate = monthlyUserSet.size > 0 ? (recentUserSet.size / monthlyUserSet.size) * 100 : 0
   
   return {
@@ -243,13 +243,13 @@ async function getDailyTrends(supabase: any) {
     .order('timestamp', { ascending: true })
   
   // Group by date
-  const dailyTrends = dailyData?.reduce((acc: any, eval: any) => {
-    const date = new Date(eval.timestamp).toISOString().split('T')[0]
+  const dailyTrends = dailyData?.reduce((acc: any, evaluation: any) => {
+    const date = new Date(evaluation.timestamp).toISOString().split('T')[0]
     if (!acc[date]) {
       acc[date] = { date, evaluations: 0, unique_users: new Set() }
     }
     acc[date].evaluations++
-    acc[date].unique_users.add(eval.user_id)
+    acc[date].unique_users.add(evaluation.user_id)
     return acc
   }, {}) || {}
   
@@ -265,8 +265,8 @@ async function getQuestionTypeBreakdown(supabase: any) {
     .from('assessment_evaluations')
     .select('question_type')
   
-  const breakdown = questionTypes?.reduce((acc: any, eval: any) => {
-    acc[eval.question_type] = (acc[eval.question_type] || 0) + 1
+  const breakdown = questionTypes?.reduce((acc: any, evaluation: any) => {
+    acc[evaluation.question_type] = (acc[evaluation.question_type] || 0) + 1
     return acc
   }, {}) || {}
   
@@ -283,15 +283,15 @@ async function getUserActivityPatterns(supabase: any) {
     .gte('timestamp', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
   
   // Group by hour of day
-  const hourlyActivity = evaluations?.reduce((acc: any, eval: any) => {
-    const hour = new Date(eval.timestamp).getHours()
+  const hourlyActivity = evaluations?.reduce((acc: any, evaluation: any) => {
+    const hour = new Date(evaluation.timestamp).getHours()
     acc[hour] = (acc[hour] || 0) + 1
     return acc
   }, {}) || {}
   
   // Group by day of week
-  const weeklyActivity = evaluations?.reduce((acc: any, eval: any) => {
-    const day = new Date(eval.timestamp).getDay()
+  const weeklyActivity = evaluations?.reduce((acc: any, evaluation: any) => {
+    const day = new Date(evaluation.timestamp).getDay()
     acc[day] = (acc[day] || 0) + 1
     return acc
   }, {}) || {}

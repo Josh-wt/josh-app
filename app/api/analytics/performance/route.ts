@@ -26,8 +26,8 @@ export async function GET(request: NextRequest) {
     const conversionRate = totalUsers > 0 ? Math.round((usersWithEvaluations / totalUsers) * 10000) / 100 : 0
 
     // Retention rate (users who did multiple evaluations)
-    const userEvaluationCounts = allEvaluations?.reduce((acc: any, eval) => {
-      acc[eval.user_id] = (acc[eval.user_id] || 0) + 1
+    const userEvaluationCounts = allEvaluations?.reduce((acc: any, evaluation) => {
+      acc[evaluation.user_id] = (acc[evaluation.user_id] || 0) + 1
       return acc
     }, {}) || {}
     
@@ -47,12 +47,12 @@ export async function GET(request: NextRequest) {
     )
 
     // Daily active users (users who did evaluations each day)
-    const dailyActiveUsers = allEvaluations?.reduce((acc: any, eval) => {
-      const date = new Date(eval.timestamp).toISOString().split('T')[0]
+    const dailyActiveUsers = allEvaluations?.reduce((acc: any, evaluation) => {
+      const date = new Date(evaluation.timestamp).toISOString().split('T')[0]
       if (!acc[date]) {
         acc[date] = new Set()
       }
-      acc[date].add(eval.user_id)
+      acc[date].add(evaluation.user_id)
       return acc
     }, {}) || {}
 
@@ -62,16 +62,16 @@ export async function GET(request: NextRequest) {
     })).sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime())
 
     // Question type performance
-    const questionTypePerformance = allEvaluations?.reduce((acc: any, eval) => {
-      if (!acc[eval.question_type]) {
-        acc[eval.question_type] = {
+    const questionTypePerformance = allEvaluations?.reduce((acc: any, evaluation) => {
+      if (!acc[evaluation.question_type]) {
+        acc[evaluation.question_type] = {
           total_evaluations: 0,
           unique_users: new Set(),
           avg_per_user: 0
         }
       }
-      acc[eval.question_type].total_evaluations++
-      acc[eval.question_type].unique_users.add(eval.user_id)
+      acc[evaluation.question_type].total_evaluations++
+      acc[evaluation.question_type].unique_users.add(evaluation.user_id)
       return acc
     }, {}) || {}
 
@@ -126,8 +126,8 @@ export async function GET(request: NextRequest) {
     })).sort((a, b) => b.total_users - a.total_users)
 
     // Weekly performance trends
-    const weeklyPerformance = allEvaluations?.reduce((acc: any, eval) => {
-      const date = new Date(eval.timestamp)
+    const weeklyPerformance = allEvaluations?.reduce((acc: any, evaluation) => {
+      const date = new Date(evaluation.timestamp)
       const weekStart = new Date(date.setDate(date.getDate() - date.getDay()))
       const weekKey = weekStart.toISOString().split('T')[0]
       
@@ -140,7 +140,7 @@ export async function GET(request: NextRequest) {
         }
       }
       acc[weekKey].evaluations++
-      acc[weekKey].unique_users.add(eval.user_id)
+      acc[weekKey].unique_users.add(evaluation.user_id)
       return acc
     }, {}) || {}
 

@@ -25,13 +25,13 @@ export async function GET(request: NextRequest) {
     ) || []
     
     // Daily evaluation trends (last 30 days)
-    const dailyEvaluations = recentEvaluations.reduce((acc: any, eval) => {
-      const date = new Date(eval.timestamp).toISOString().split('T')[0]
+    const dailyEvaluations = recentEvaluations.reduce((acc: any, evaluation) => {
+      const date = new Date(evaluation.timestamp).toISOString().split('T')[0]
       if (!acc[date]) {
         acc[date] = { date, evaluations: 0, unique_users: new Set() }
       }
       acc[date].evaluations++
-      acc[date].unique_users.add(eval.user_id)
+      acc[date].unique_users.add(evaluation.user_id)
       return acc
     }, {})
     
@@ -42,14 +42,14 @@ export async function GET(request: NextRequest) {
     })).sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime())
 
     // Question type breakdown
-    const questionTypeBreakdown = recentEvaluations.reduce((acc: any, eval) => {
-      acc[eval.question_type] = (acc[eval.question_type] || 0) + 1
+    const questionTypeBreakdown = recentEvaluations.reduce((acc: any, evaluation) => {
+      acc[evaluation.question_type] = (acc[evaluation.question_type] || 0) + 1
       return acc
     }, {})
 
     // Return users analysis (users with multiple evaluations)
-    const userEvaluationCounts = recentEvaluations.reduce((acc: any, eval) => {
-      acc[eval.user_id] = (acc[eval.user_id] || 0) + 1
+    const userEvaluationCounts = recentEvaluations.reduce((acc: any, evaluation) => {
+      acc[evaluation.user_id] = (acc[evaluation.user_id] || 0) + 1
       return acc
     }, {})
     
@@ -57,8 +57,8 @@ export async function GET(request: NextRequest) {
     const singleEvaluationUsers = Object.values(userEvaluationCounts).filter((count: any) => count === 1).length
 
     // Weekly trends
-    const weeklyTrends = recentEvaluations.reduce((acc: any, eval) => {
-      const date = new Date(eval.timestamp)
+    const weeklyTrends = recentEvaluations.reduce((acc: any, evaluation) => {
+      const date = new Date(evaluation.timestamp)
       const weekStart = new Date(date.setDate(date.getDate() - date.getDay()))
       const weekKey = weekStart.toISOString().split('T')[0]
       
@@ -66,7 +66,7 @@ export async function GET(request: NextRequest) {
         acc[weekKey] = { week: weekKey, evaluations: 0, unique_users: new Set() }
       }
       acc[weekKey].evaluations++
-      acc[weekKey].unique_users.add(eval.user_id)
+      acc[weekKey].unique_users.add(evaluation.user_id)
       return acc
     }, {})
 
