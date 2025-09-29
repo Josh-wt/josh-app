@@ -80,6 +80,12 @@ export function EnhancedMarketingDashboard() {
   const [selectedTimeRange, setSelectedTimeRange] = useState(30)
   const [refreshing, setRefreshing] = useState(false)
   const [activeTab, setActiveTab] = useState<'overview' | 'assessments' | 'learning' | 'performance' | 'analytics'>('overview')
+  
+  // Additional comprehensive metrics
+  const [evaluationMetrics, setEvaluationMetrics] = useState<any>(null)
+  const [userMetrics, setUserMetrics] = useState<any>(null)
+  const [engagementMetrics, setEngagementMetrics] = useState<any>(null)
+  const [performanceMetrics, setPerformanceMetrics] = useState<any>(null)
 
   const fetchMetrics = async (timeRange: number = selectedTimeRange) => {
     try {
@@ -115,12 +121,48 @@ export function EnhancedMarketingDashboard() {
   useEffect(() => {
     fetchMetrics()
     fetchAnalyticsData()
+    fetchComprehensiveMetrics()
   }, [])
+
+  const fetchComprehensiveMetrics = async () => {
+    try {
+      // Fetch evaluation metrics
+      const evaluationResponse = await fetch('/api/analytics/evaluations')
+      if (evaluationResponse.ok) {
+        const evaluationData = await evaluationResponse.json()
+        setEvaluationMetrics(evaluationData)
+      }
+
+      // Fetch user metrics
+      const userResponse = await fetch('/api/analytics/users')
+      if (userResponse.ok) {
+        const userData = await userResponse.json()
+        setUserMetrics(userData)
+      }
+
+      // Fetch engagement metrics
+      const engagementResponse = await fetch('/api/analytics/engagement')
+      if (engagementResponse.ok) {
+        const engagementData = await engagementResponse.json()
+        setEngagementMetrics(engagementData)
+      }
+
+      // Fetch performance metrics
+      const performanceResponse = await fetch('/api/analytics/performance')
+      if (performanceResponse.ok) {
+        const performanceData = await performanceResponse.json()
+        setPerformanceMetrics(performanceData)
+      }
+    } catch (err) {
+      console.error('Failed to fetch comprehensive metrics:', err)
+    }
+  }
 
   const handleRefresh = () => {
     setRefreshing(true)
     fetchMetrics()
     fetchAnalyticsData()
+    fetchComprehensiveMetrics()
   }
 
   const handleTimeRangeChange = (timeRange: number) => {
@@ -484,11 +526,11 @@ export function EnhancedMarketingDashboard() {
               <GlassCard className="p-4 hover">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-slate-600 mb-1">Recent Evaluations</p>
+                    <p className="text-sm text-slate-600 mb-1">Total Evaluations</p>
                     <p className="text-2xl font-bold text-slate-800">
-                      {formatNumber(metrics.assessmentAnalytics.recent_evaluations)}
+                      {evaluationMetrics?.total_evaluations || 0}
                     </p>
-                    <p className="text-xs text-slate-500">Last {selectedTimeRange} days</p>
+                    <p className="text-xs text-slate-500">All time</p>
                   </div>
                   <FileText className="w-8 h-8 text-blue-500" />
                 </div>
@@ -497,36 +539,40 @@ export function EnhancedMarketingDashboard() {
               <GlassCard className="p-4 hover">
                 <div className="flex items-center justify-between">
                   <div>
+                    <p className="text-sm text-slate-600 mb-1">Recent Evaluations</p>
+                    <p className="text-2xl font-bold text-slate-800">
+                      {evaluationMetrics?.recent_evaluations || 0}
+                    </p>
+                    <p className="text-xs text-slate-500">Last 30 days</p>
+                  </div>
+                  <Clock className="w-8 h-8 text-green-500" />
+                </div>
+              </GlassCard>
+
+              <GlassCard className="p-4 hover">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-slate-600 mb-1">Return Users</p>
+                    <p className="text-2xl font-bold text-slate-800">
+                      {evaluationMetrics?.return_users || 0}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {evaluationMetrics?.return_rate || 0}% return rate
+                    </p>
+                  </div>
+                  <UserCheck className="w-8 h-8 text-purple-500" />
+                </div>
+              </GlassCard>
+
+              <GlassCard className="p-4 hover">
+                <div className="flex items-center justify-between">
+                  <div>
                     <p className="text-sm text-slate-600 mb-1">Avg per User</p>
                     <p className="text-2xl font-bold text-slate-800">
-                      {metrics.assessmentAnalytics.engagement_metrics.avg_evaluations_per_user}
+                      {evaluationMetrics?.avg_evaluations_per_user?.toFixed(1) || 0}
                     </p>
                   </div>
-                  <Users className="w-8 h-8 text-green-500" />
-                </div>
-              </GlassCard>
-
-              <GlassCard className="p-4 hover">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-slate-600 mb-1">Multi-Evaluators</p>
-                    <p className="text-2xl font-bold text-slate-800">
-                      {formatNumber(metrics.assessmentAnalytics.engagement_metrics.users_with_multiple_evaluations)}
-                    </p>
-                  </div>
-                  <Star className="w-8 h-8 text-purple-500" />
-                </div>
-              </GlassCard>
-
-              <GlassCard className="p-4 hover">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-slate-600 mb-1">Max Evaluations</p>
-                    <p className="text-2xl font-bold text-slate-800">
-                      {formatNumber(metrics.assessmentAnalytics.engagement_metrics.most_active_user_evaluations)}
-                    </p>
-                  </div>
-                  <Trophy className="w-8 h-8 text-orange-500" />
+                  <BarChart3 className="w-8 h-8 text-orange-500" />
                 </div>
               </GlassCard>
             </div>
@@ -535,10 +581,10 @@ export function EnhancedMarketingDashboard() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
               {/* Daily Evaluations Chart */}
               <GlassCard className="p-6">
-                <h3 className="text-lg font-semibold text-slate-800 mb-4">Daily Evaluations</h3>
+                <h3 className="text-lg font-semibold text-slate-800 mb-4">Daily Evaluations (30d)</h3>
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={metrics.assessmentAnalytics.daily_evaluations}>
+                    <AreaChart data={evaluationMetrics?.daily_trends || []}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                       <XAxis 
                         dataKey="date" 
@@ -557,9 +603,17 @@ export function EnhancedMarketingDashboard() {
                       />
                       <Area 
                         type="monotone" 
-                        dataKey="count" 
+                        dataKey="evaluations" 
                         stroke="#3b82f6" 
                         fill="#3b82f6"
+                        fillOpacity={0.3}
+                        strokeWidth={2}
+                      />
+                      <Area 
+                        type="monotone" 
+                        dataKey="unique_users" 
+                        stroke="#10b981" 
+                        fill="#10b981"
                         fillOpacity={0.3}
                         strokeWidth={2}
                       />
@@ -575,16 +629,16 @@ export function EnhancedMarketingDashboard() {
                   <ResponsiveContainer width="100%" height="100%">
                     <RechartsPieChart>
                       <Pie
-                        data={metrics.assessmentAnalytics.question_type_breakdown}
+                        data={evaluationMetrics?.question_types || []}
                         cx="50%"
                         cy="50%"
                         labelLine={false}
-                        label={({ question_type, count }) => `${question_type.replace('igcse_', '').replace('alevel_', '')}: ${count}`}
+                        label={({ name, count }) => `${name}: ${count}`}
                         outerRadius={80}
                         fill="#8884d8"
                         dataKey="count"
                       >
-                        {metrics.assessmentAnalytics.question_type_breakdown.map((entry, index) => (
+                        {(evaluationMetrics?.question_types || []).map((entry: any, index: number) => (
                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                         ))}
                       </Pie>
@@ -626,9 +680,9 @@ export function EnhancedMarketingDashboard() {
                   <div>
                     <p className="text-sm text-slate-600 mb-1">Study Streaks</p>
                     <p className="text-2xl font-bold text-slate-800">
-                      {formatNumber(metrics.learningProgressAnalytics.study_streaks.total_users_with_streaks)}
+                      {engagementMetrics?.study_streaks || 0}
                     </p>
-                    <p className="text-xs text-slate-500">Avg: {metrics.learningProgressAnalytics.study_streaks.avg_current_streak} days</p>
+                    <p className="text-xs text-slate-500">Active streaks</p>
                   </div>
                   <Zap className="w-8 h-8 text-yellow-500" />
                 </div>
@@ -639,7 +693,7 @@ export function EnhancedMarketingDashboard() {
                   <div>
                     <p className="text-sm text-slate-600 mb-1">Max Streak</p>
                     <p className="text-2xl font-bold text-slate-800">
-                      {formatNumber(metrics.learningProgressAnalytics.study_streaks.max_current_streak)}
+                      {engagementMetrics?.max_streak || 0}
                     </p>
                     <p className="text-xs text-slate-500">days</p>
                   </div>
@@ -652,9 +706,9 @@ export function EnhancedMarketingDashboard() {
                   <div>
                     <p className="text-sm text-slate-600 mb-1">Saved Resources</p>
                     <p className="text-2xl font-bold text-slate-800">
-                      {formatNumber(metrics.learningProgressAnalytics.saved_resources.total_saved_resources)}
+                      {engagementMetrics?.saved_resources || 0}
                     </p>
-                    <p className="text-xs text-slate-500">Avg: {metrics.learningProgressAnalytics.saved_resources.avg_resources_per_user} per user</p>
+                    <p className="text-xs text-slate-500">Total saved</p>
                   </div>
                   <BookOpen className="w-8 h-8 text-blue-500" />
                 </div>
@@ -665,9 +719,9 @@ export function EnhancedMarketingDashboard() {
                   <div>
                     <p className="text-sm text-slate-600 mb-1">Goal Completion</p>
                     <p className="text-2xl font-bold text-slate-800">
-                      {metrics.learningProgressAnalytics.study_goals.completion_rate}%
+                      {engagementMetrics?.goal_completion_rate || 0}%
                     </p>
-                    <p className="text-xs text-slate-500">{formatNumber(metrics.learningProgressAnalytics.study_goals.completed_goals)} completed</p>
+                    <p className="text-xs text-slate-500">Success rate</p>
                   </div>
                   <CheckCircle className="w-8 h-8 text-green-500" />
                 </div>
@@ -741,7 +795,7 @@ export function EnhancedMarketingDashboard() {
                   <div>
                     <p className="text-sm text-slate-600 mb-1">Conversion Rate</p>
                     <p className="text-2xl font-bold text-slate-800">
-                      {metrics.performanceInsights.subscription_analytics.conversion_rate}%
+                      {performanceMetrics?.conversion_rate || 0}%
                     </p>
                     <p className="text-xs text-slate-500">{formatNumber(metrics.performanceInsights.subscription_analytics.total_subscribers)} subscribers</p>
                   </div>
@@ -754,7 +808,7 @@ export function EnhancedMarketingDashboard() {
                   <div>
                     <p className="text-sm text-slate-600 mb-1">Retention Rate</p>
                     <p className="text-2xl font-bold text-slate-800">
-                      {metrics.performanceInsights.growth_indicators.retention_rate_7d}%
+                      {performanceMetrics?.retention_rate || 0}%
                     </p>
                     <p className="text-xs text-slate-500">7-day retention</p>
                   </div>
@@ -767,9 +821,9 @@ export function EnhancedMarketingDashboard() {
                   <div>
                     <p className="text-sm text-slate-600 mb-1">New Users (7d)</p>
                     <p className="text-2xl font-bold text-slate-800">
-                      {formatNumber(metrics.performanceInsights.growth_indicators.new_users_last_7_days)}
+                      {userMetrics?.new_users_7d || 0}
                     </p>
-                    <p className="text-xs text-slate-500">vs {formatNumber(metrics.performanceInsights.growth_indicators.new_users_last_30_days)} (30d)</p>
+                    <p className="text-xs text-slate-500">vs {userMetrics?.new_users_30d || 0} (30d)</p>
                   </div>
                   <UserPlus className="w-8 h-8 text-purple-500" />
                 </div>
@@ -780,9 +834,9 @@ export function EnhancedMarketingDashboard() {
                   <div>
                     <p className="text-sm text-slate-600 mb-1">Feedback Quality</p>
                     <p className="text-2xl font-bold text-slate-800">
-                      {metrics.performanceInsights.feedback_quality.positive_feedback_rate}%
+                      {performanceMetrics?.feedback_quality || 0}%
                     </p>
-                    <p className="text-xs text-slate-500">{formatNumber(metrics.performanceInsights.feedback_quality.total_feedback_responses)} responses</p>
+                    <p className="text-xs text-slate-500">Positive feedback</p>
                   </div>
                   <Star className="w-8 h-8 text-yellow-500" />
                 </div>

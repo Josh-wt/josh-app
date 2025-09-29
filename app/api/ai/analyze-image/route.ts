@@ -13,8 +13,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const apiKey = process.env.NEXT_PUBLIC_QWEN_API_KEY
+    const apiKey = process.env.QWEN_API_KEY
     if (!apiKey) {
+      console.error('Missing QWEN_API_KEY environment variable')
       return NextResponse.json(
         { error: 'AI service not configured - missing API key' },
         { status: 500 }
@@ -25,10 +26,35 @@ export async function POST(request: NextRequest) {
     let base64Image = ""
 
     if (imageFile) {
+      // Validate image format
+      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
+      if (!allowedTypes.includes(imageFile.type)) {
+        return NextResponse.json(
+          { error: `Unsupported image format: ${imageFile.type}. Supported formats: ${allowedTypes.join(', ')}` },
+          { status: 400 }
+        )
+      }
+
+      // Check file size (max 10MB)
+      const maxSize = 10 * 1024 * 1024 // 10MB
+      if (imageFile.size > maxSize) {
+        return NextResponse.json(
+          { error: `Image too large: ${imageFile.size} bytes. Maximum size: ${maxSize} bytes` },
+          { status: 400 }
+        )
+      }
+
       // Convert image to base64
       const arrayBuffer = await imageFile.arrayBuffer()
       const buffer = Buffer.from(arrayBuffer)
       base64Image = buffer.toString('base64')
+      
+      console.log('Image processing:', {
+        fileName: imageFile.name,
+        fileType: imageFile.type,
+        fileSize: imageFile.size,
+        base64Length: base64Image.length
+      })
     }
 
     const prompt = imageFile 
@@ -144,6 +170,20 @@ Be accurate with nutrition data based on USDA nutrition database. If uncertain a
       }
     ]
 
+    const requestBody = {
+      model: imageFile ? "qwen/qwen-vl-72b-instruct" : "qwen/qwen-2.5-72b-instruct",
+      messages,
+      temperature: 0.3,
+      max_tokens: 2000
+    }
+    
+    console.log('API Request:', {
+      model: requestBody.model,
+      messageCount: messages.length,
+      hasImage: !!imageFile,
+      imageType: imageFile?.type
+    })
+
     const response = await fetch(`${baseUrl}/chat/completions`, {
       method: "POST",
       headers: {
@@ -152,19 +192,19 @@ Be accurate with nutrition data based on USDA nutrition database. If uncertain a
         "HTTP-Referer": process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000",
         "X-Title": "Josh App Meals Tracker"
       },
-      body: JSON.stringify({
-        model: imageFile ? "qwen/qwen-vl-72b-instruct" : "qwen/qwen-2.5-72b-instruct",
-        messages,
-        temperature: 0.3,
-        max_tokens: 2000
-      })
+      body: JSON.stringify(requestBody)
     })
 
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('OpenRouter API error:', response.status, errorText)
+      console.error('OpenRouter API error:', {
+        status: response.status,
+        statusText: response.statusText,
+        errorText,
+        model: imageFile ? "qwen/qwen-vl-72b-instruct" : "qwen/qwen-2.5-72b-instruct"
+      })
       return NextResponse.json(
-        { error: `AI API error: ${response.status} ${response.statusText}` },
+        { error: `AI API error: ${response.status} ${response.statusText}. Details: ${errorText}` },
         { status: response.status }
       )
     }
@@ -203,7 +243,7 @@ Be accurate with nutrition data based on USDA nutrition database. If uncertain a
   } catch (error) {
     console.error("Error in AI image analysis API:", error)
     return NextResponse.json(
-      { error: `Failed to analyze ${imageFile ? 'image' : 'description'}: ${error instanceof Error ? error.message : "Unknown error"}` },
+      { error: `Failed to analyze request: ${error instanceof Error ? error.message : "Unknown error"}` },
       { status: 500 }
     )
   }
