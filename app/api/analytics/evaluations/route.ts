@@ -91,7 +91,7 @@ export async function GET(request: NextRequest) {
         type,
         count,
         percentage: Math.round((count as number / recentEvaluations.length) * 10000) / 100
-      })).sort((a, b) => b.count - a.count)
+      })).sort((a, b) => (b.count as number) - (a.count as number))
     })
     
   } catch (error) {
