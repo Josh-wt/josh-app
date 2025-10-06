@@ -2090,6 +2090,175 @@ export function EnhancedMarketingDashboard() {
                       </div>
                     )}
                   </div>
+
+                  {/* User Profile Information */}
+                  <div className="mt-6">
+                    <h4 className="font-semibold text-slate-700 mb-3">Profile Information</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-3">
+                        <div className="flex justify-between">
+                          <span className="text-sm font-medium text-slate-600">User ID:</span>
+                          <span className="text-sm text-slate-800 font-mono">{selectedUserDetails.id}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-sm font-medium text-slate-600">Email:</span>
+                          <span className="text-sm text-slate-800">{selectedUserDetails.email}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-sm font-medium text-slate-600">Full Name:</span>
+                          <span className="text-sm text-slate-800">{selectedUserDetails.full_name || 'N/A'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-sm font-medium text-slate-600">Academic Level:</span>
+                          <span className="text-sm text-slate-800">{selectedUserDetails.academic_level || 'N/A'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-sm font-medium text-slate-600">Created:</span>
+                          <span className="text-sm text-slate-800">
+                            {selectedUserDetails.created_at ? new Date(selectedUserDetails.created_at).toLocaleDateString() : 'N/A'}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="space-y-3">
+                        <div className="flex justify-between">
+                          <span className="text-sm font-medium text-slate-600">Questions Marked:</span>
+                          <span className="text-sm text-slate-800">{selectedUserDetails.questions_marked || 0}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-sm font-medium text-slate-600">Credits:</span>
+                          <span className="text-sm text-slate-800">{selectedUserDetails.credits || 0}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-sm font-medium text-slate-600">Current Plan:</span>
+                          <span className="text-sm text-slate-800">{selectedUserDetails.current_plan || 'free'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-sm font-medium text-slate-600">Subscription Status:</span>
+                          <span className={`text-sm px-2 py-1 rounded-full ${
+                            selectedUserDetails.subscription_status === 'active' ? 'bg-green-100 text-green-800' :
+                            selectedUserDetails.subscription_status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                            'bg-slate-100 text-slate-800'
+                          }`}>
+                            {selectedUserDetails.subscription_status || 'free'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-sm font-medium text-slate-600">Launch User:</span>
+                          <span className="text-sm text-slate-800">{selectedUserDetails.is_launch_user ? 'Yes' : 'No'}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Study Goals */}
+                  {userRelatedData.goals.length > 0 && (
+                    <div className="mt-6">
+                      <h4 className="font-semibold text-slate-700 mb-3">Study Goals ({userRelatedData.goals.length})</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {userRelatedData.goals.slice(0, 4).map((goal, index) => (
+                          <GlassCard key={index} className="p-4">
+                            <div className="flex items-center justify-between mb-2">
+                              <h5 className="font-medium text-slate-800">{goal.title || 'Untitled Goal'}</h5>
+                              <span className="text-xs text-slate-500">
+                                {goal.created_at ? new Date(goal.created_at).toLocaleDateString() : 'N/A'}
+                              </span>
+                            </div>
+                            <p className="text-sm text-slate-600 mb-2">
+                              {goal.description || 'No description available'}
+                            </p>
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-slate-500">Status: {goal.status || 'active'}</span>
+                              {goal.target_date && (
+                                <span className="text-xs text-slate-500">
+                                  Target: {new Date(goal.target_date).toLocaleDateString()}
+                                </span>
+                              )}
+                            </div>
+                          </GlassCard>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Study Streaks */}
+                  {userRelatedData.streaks.length > 0 && (
+                    <div className="mt-6">
+                      <h4 className="font-semibold text-slate-700 mb-3">Study Streaks</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {userRelatedData.streaks.slice(0, 3).map((streak, index) => (
+                          <GlassCard key={index} className="p-4">
+                            <div className="flex items-center space-x-3">
+                              <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
+                                <Zap className="w-5 h-5 text-orange-600" />
+                              </div>
+                              <div>
+                                <p className="text-2xl font-bold text-slate-800">{streak.current_streak || 0}</p>
+                                <p className="text-sm text-slate-600">Current Streak</p>
+                              </div>
+                            </div>
+                            <div className="mt-3 text-xs text-slate-500">
+                              <div>Longest: {streak.longest_streak || 0} days</div>
+                              <div>Last Activity: {streak.last_activity_date ? new Date(streak.last_activity_date).toLocaleDateString() : 'N/A'}</div>
+                            </div>
+                          </GlassCard>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Saved Resources */}
+                  {userRelatedData.resources.length > 0 && (
+                    <div className="mt-6">
+                      <h4 className="font-semibold text-slate-700 mb-3">Saved Resources ({userRelatedData.resources.length})</h4>
+                      <div className="space-y-2">
+                        {userRelatedData.resources.slice(0, 5).map((resource, index) => (
+                          <div key={index} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                            <div>
+                              <p className="font-medium text-slate-800">{resource.title || 'Untitled Resource'}</p>
+                              <p className="text-xs text-slate-500">{resource.type || 'Unknown Type'}</p>
+                            </div>
+                            <span className="text-xs text-slate-500">
+                              {resource.created_at ? new Date(resource.created_at).toLocaleDateString() : 'N/A'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Subscription Details */}
+                  {userRelatedData.subscriptions.length > 0 && (
+                    <div className="mt-6">
+                      <h4 className="font-semibold text-slate-700 mb-3">Subscription Details</h4>
+                      <div className="space-y-3">
+                        {userRelatedData.subscriptions.map((subscription, index) => (
+                          <GlassCard key={index} className="p-4">
+                            <div className="flex items-center justify-between mb-3">
+                              <div>
+                                <h5 className="font-medium text-slate-800">{subscription.plan_name || 'Unknown Plan'}</h5>
+                                <p className="text-sm text-slate-600">${subscription.amount || 0} / {subscription.interval || 'month'}</p>
+                              </div>
+                              <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                                subscription.status === 'active' ? 'bg-green-100 text-green-800' :
+                                subscription.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                                'bg-slate-100 text-slate-800'
+                              }`}>
+                                {subscription.status || 'unknown'}
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4 text-xs text-slate-500">
+                              <div>
+                                <span className="font-medium">Started:</span> {subscription.start_date ? new Date(subscription.start_date).toLocaleDateString() : 'N/A'}
+                              </div>
+                              <div>
+                                <span className="font-medium">Next Billing:</span> {subscription.next_billing_date ? new Date(subscription.next_billing_date).toLocaleDateString() : 'N/A'}
+                              </div>
+                            </div>
+                          </GlassCard>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </GlassCard>
               </div>
             )}
