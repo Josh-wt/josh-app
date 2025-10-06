@@ -79,7 +79,24 @@ export function EnhancedMarketingDashboard() {
   const [analyticsError, setAnalyticsError] = useState<string | null>(null)
   const [selectedTimeRange, setSelectedTimeRange] = useState(30)
   const [refreshing, setRefreshing] = useState(false)
-  const [activeTab, setActiveTab] = useState<'overview' | 'assessments' | 'learning' | 'performance' | 'analytics'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'assessments' | 'learning' | 'performance' | 'analytics' | 'database'>('overview')
+  
+  // Additional comprehensive metrics
+  const [evaluationMetrics, setEvaluationMetrics] = useState<any>(null)
+  const [userMetrics, setUserMetrics] = useState<any>(null)
+  const [engagementMetrics, setEngagementMetrics] = useState<any>(null)
+  const [performanceMetrics, setPerformanceMetrics] = useState<any>(null)
+
+  // Database browser state
+  const [databaseTables, setDatabaseTables] = useState<any[]>([])
+  const [selectedTable, setSelectedTable] = useState<string>('')
+  const [tableData, setTableData] = useState<any[]>([])
+  const [selectedUser, setSelectedUser] = useState<any>(null)
+  const [userEvaluations, setUserEvaluations] = useState<any[]>([])
+  const [databaseLoading, setDatabaseLoading] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage] = useState(20)
 
   const fetchMetrics = async (timeRange: number = selectedTimeRange) => {
     try {
@@ -115,12 +132,104 @@ export function EnhancedMarketingDashboard() {
   useEffect(() => {
     fetchMetrics()
     fetchAnalyticsData()
+    fetchComprehensiveMetrics()
+    fetchDatabaseTables()
   }, [])
+
+  const fetchComprehensiveMetrics = async () => {
+    try {
+      // Fetch evaluation metrics
+      const evaluationResponse = await fetch('/api/analytics/evaluations')
+      if (evaluationResponse.ok) {
+        const evaluationData = await evaluationResponse.json()
+        setEvaluationMetrics(evaluationData)
+      }
+
+      // Fetch user metrics
+      const userResponse = await fetch('/api/analytics/users')
+      if (userResponse.ok) {
+        const userData = await userResponse.json()
+        setUserMetrics(userData)
+      }
+
+      // Fetch engagement metrics
+      const engagementResponse = await fetch('/api/analytics/engagement')
+      if (engagementResponse.ok) {
+        const engagementData = await engagementResponse.json()
+        setEngagementMetrics(engagementData)
+      }
+
+      // Fetch performance metrics
+      const performanceResponse = await fetch('/api/analytics/performance')
+      if (performanceResponse.ok) {
+        const performanceData = await performanceResponse.json()
+        setPerformanceMetrics(performanceData)
+      }
+    } catch (err) {
+      console.error('Failed to fetch comprehensive metrics:', err)
+    }
+  }
+
+  const fetchDatabaseTables = async () => {
+    try {
+      setDatabaseLoading(true)
+      const response = await fetch('/api/analytics/comprehensive')
+      if (response.ok) {
+        const data = await response.json()
+        // Get table information from the comprehensive API
+        const tables = [
+          { name: 'assessment_users', displayName: 'Assessment Users', description: 'User accounts and profiles' },
+          { name: 'assessment_evaluations', displayName: 'Evaluations', description: 'Student evaluations and feedback' },
+          { name: 'study_goals', displayName: 'Study Goals', description: 'User learning goals and progress' },
+          { name: 'study_streaks', displayName: 'Study Streaks', description: 'User study streak data' },
+          { name: 'saved_resources', displayName: 'Saved Resources', description: 'User saved learning resources' },
+          { name: 'subscriptions', displayName: 'Subscriptions', description: 'Subscription plans and billing' },
+          { name: 'profiles', displayName: 'Profiles', description: 'User profile information' }
+        ]
+        setDatabaseTables(tables)
+      }
+    } catch (err) {
+      console.error('Failed to fetch database tables:', err)
+    } finally {
+      setDatabaseLoading(false)
+    }
+  }
+
+  const fetchTableData = async (tableName: string) => {
+    try {
+      setDatabaseLoading(true)
+      const response = await fetch(`/api/analytics/standard?table=${tableName}&limit=100`)
+      if (response.ok) {
+        const data = await response.json()
+        setTableData(data.data || [])
+      }
+    } catch (err) {
+      console.error('Failed to fetch table data:', err)
+    } finally {
+      setDatabaseLoading(false)
+    }
+  }
+
+  const fetchUserEvaluations = async (userId: string) => {
+    try {
+      setDatabaseLoading(true)
+      const response = await fetch(`/api/analytics/standard?table=assessment_evaluations&filter=user_id:${userId}&limit=50`)
+      if (response.ok) {
+        const data = await response.json()
+        setUserEvaluations(data.data || [])
+      }
+    } catch (err) {
+      console.error('Failed to fetch user evaluations:', err)
+    } finally {
+      setDatabaseLoading(false)
+    }
+  }
 
   const handleRefresh = () => {
     setRefreshing(true)
     fetchMetrics()
     fetchAnalyticsData()
+    fetchComprehensiveMetrics()
   }
 
   const handleTimeRangeChange = (timeRange: number) => {
@@ -247,7 +356,8 @@ export function EnhancedMarketingDashboard() {
             { id: 'assessments', label: 'Assessments', icon: FileText },
             { id: 'learning', label: 'Learning', icon: BookOpen },
             { id: 'performance', label: 'Performance', icon: Trophy },
-            { id: 'analytics', label: 'Analytics', icon: Globe }
+            { id: 'analytics', label: 'Analytics', icon: Globe },
+            { id: 'database', label: 'Database Browser', icon: Activity }
           ].map((tab) => (
             <button
               key={tab.id}
@@ -484,11 +594,11 @@ export function EnhancedMarketingDashboard() {
               <GlassCard className="p-4 hover">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-slate-600 mb-1">Recent Evaluations</p>
+                    <p className="text-sm text-slate-600 mb-1">Total Evaluations</p>
                     <p className="text-2xl font-bold text-slate-800">
-                      {formatNumber(metrics.assessmentAnalytics.recent_evaluations)}
+                      {evaluationMetrics?.total_evaluations || 0}
                     </p>
-                    <p className="text-xs text-slate-500">Last {selectedTimeRange} days</p>
+                    <p className="text-xs text-slate-500">All time</p>
                   </div>
                   <FileText className="w-8 h-8 text-blue-500" />
                 </div>
@@ -497,36 +607,40 @@ export function EnhancedMarketingDashboard() {
               <GlassCard className="p-4 hover">
                 <div className="flex items-center justify-between">
                   <div>
+                    <p className="text-sm text-slate-600 mb-1">Recent Evaluations</p>
+                    <p className="text-2xl font-bold text-slate-800">
+                      {evaluationMetrics?.recent_evaluations || 0}
+                    </p>
+                    <p className="text-xs text-slate-500">Last 30 days</p>
+                  </div>
+                  <Clock className="w-8 h-8 text-green-500" />
+                </div>
+              </GlassCard>
+
+              <GlassCard className="p-4 hover">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-slate-600 mb-1">Return Users</p>
+                    <p className="text-2xl font-bold text-slate-800">
+                      {evaluationMetrics?.return_users || 0}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {evaluationMetrics?.return_rate || 0}% return rate
+                    </p>
+                  </div>
+                  <UserCheck className="w-8 h-8 text-purple-500" />
+                </div>
+              </GlassCard>
+
+              <GlassCard className="p-4 hover">
+                <div className="flex items-center justify-between">
+                  <div>
                     <p className="text-sm text-slate-600 mb-1">Avg per User</p>
                     <p className="text-2xl font-bold text-slate-800">
-                      {metrics.assessmentAnalytics.engagement_metrics.avg_evaluations_per_user}
+                      {evaluationMetrics?.avg_evaluations_per_user?.toFixed(1) || 0}
                     </p>
                   </div>
-                  <Users className="w-8 h-8 text-green-500" />
-                </div>
-              </GlassCard>
-
-              <GlassCard className="p-4 hover">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-slate-600 mb-1">Multi-Evaluators</p>
-                    <p className="text-2xl font-bold text-slate-800">
-                      {formatNumber(metrics.assessmentAnalytics.engagement_metrics.users_with_multiple_evaluations)}
-                    </p>
-                  </div>
-                  <Star className="w-8 h-8 text-purple-500" />
-                </div>
-              </GlassCard>
-
-              <GlassCard className="p-4 hover">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-slate-600 mb-1">Max Evaluations</p>
-                    <p className="text-2xl font-bold text-slate-800">
-                      {formatNumber(metrics.assessmentAnalytics.engagement_metrics.most_active_user_evaluations)}
-                    </p>
-                  </div>
-                  <Trophy className="w-8 h-8 text-orange-500" />
+                  <BarChart3 className="w-8 h-8 text-orange-500" />
                 </div>
               </GlassCard>
             </div>
@@ -535,10 +649,10 @@ export function EnhancedMarketingDashboard() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
               {/* Daily Evaluations Chart */}
               <GlassCard className="p-6">
-                <h3 className="text-lg font-semibold text-slate-800 mb-4">Daily Evaluations</h3>
+                <h3 className="text-lg font-semibold text-slate-800 mb-4">Daily Evaluations (30d)</h3>
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={metrics.assessmentAnalytics.daily_evaluations}>
+                    <AreaChart data={evaluationMetrics?.daily_trends || []}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                       <XAxis 
                         dataKey="date" 
@@ -557,9 +671,17 @@ export function EnhancedMarketingDashboard() {
                       />
                       <Area 
                         type="monotone" 
-                        dataKey="count" 
+                        dataKey="evaluations" 
                         stroke="#3b82f6" 
                         fill="#3b82f6"
+                        fillOpacity={0.3}
+                        strokeWidth={2}
+                      />
+                      <Area 
+                        type="monotone" 
+                        dataKey="unique_users" 
+                        stroke="#10b981" 
+                        fill="#10b981"
                         fillOpacity={0.3}
                         strokeWidth={2}
                       />
@@ -575,16 +697,16 @@ export function EnhancedMarketingDashboard() {
                   <ResponsiveContainer width="100%" height="100%">
                     <RechartsPieChart>
                       <Pie
-                        data={metrics.assessmentAnalytics.question_type_breakdown}
+                        data={evaluationMetrics?.question_types || []}
                         cx="50%"
                         cy="50%"
                         labelLine={false}
-                        label={({ question_type, count }) => `${question_type.replace('igcse_', '').replace('alevel_', '')}: ${count}`}
+                        label={({ name, count }) => `${name}: ${count}`}
                         outerRadius={80}
                         fill="#8884d8"
                         dataKey="count"
                       >
-                        {metrics.assessmentAnalytics.question_type_breakdown.map((entry, index) => (
+                        {(evaluationMetrics?.question_types || []).map((entry: any, index: number) => (
                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                         ))}
                       </Pie>
@@ -626,9 +748,9 @@ export function EnhancedMarketingDashboard() {
                   <div>
                     <p className="text-sm text-slate-600 mb-1">Study Streaks</p>
                     <p className="text-2xl font-bold text-slate-800">
-                      {formatNumber(metrics.learningProgressAnalytics.study_streaks.total_users_with_streaks)}
+                      {engagementMetrics?.study_streaks || 0}
                     </p>
-                    <p className="text-xs text-slate-500">Avg: {metrics.learningProgressAnalytics.study_streaks.avg_current_streak} days</p>
+                    <p className="text-xs text-slate-500">Active streaks</p>
                   </div>
                   <Zap className="w-8 h-8 text-yellow-500" />
                 </div>
@@ -639,7 +761,7 @@ export function EnhancedMarketingDashboard() {
                   <div>
                     <p className="text-sm text-slate-600 mb-1">Max Streak</p>
                     <p className="text-2xl font-bold text-slate-800">
-                      {formatNumber(metrics.learningProgressAnalytics.study_streaks.max_current_streak)}
+                      {engagementMetrics?.max_streak || 0}
                     </p>
                     <p className="text-xs text-slate-500">days</p>
                   </div>
@@ -652,9 +774,9 @@ export function EnhancedMarketingDashboard() {
                   <div>
                     <p className="text-sm text-slate-600 mb-1">Saved Resources</p>
                     <p className="text-2xl font-bold text-slate-800">
-                      {formatNumber(metrics.learningProgressAnalytics.saved_resources.total_saved_resources)}
+                      {engagementMetrics?.saved_resources || 0}
                     </p>
-                    <p className="text-xs text-slate-500">Avg: {metrics.learningProgressAnalytics.saved_resources.avg_resources_per_user} per user</p>
+                    <p className="text-xs text-slate-500">Total saved</p>
                   </div>
                   <BookOpen className="w-8 h-8 text-blue-500" />
                 </div>
@@ -665,9 +787,9 @@ export function EnhancedMarketingDashboard() {
                   <div>
                     <p className="text-sm text-slate-600 mb-1">Goal Completion</p>
                     <p className="text-2xl font-bold text-slate-800">
-                      {metrics.learningProgressAnalytics.study_goals.completion_rate}%
+                      {engagementMetrics?.goal_completion_rate || 0}%
                     </p>
-                    <p className="text-xs text-slate-500">{formatNumber(metrics.learningProgressAnalytics.study_goals.completed_goals)} completed</p>
+                    <p className="text-xs text-slate-500">Success rate</p>
                   </div>
                   <CheckCircle className="w-8 h-8 text-green-500" />
                 </div>
@@ -741,7 +863,7 @@ export function EnhancedMarketingDashboard() {
                   <div>
                     <p className="text-sm text-slate-600 mb-1">Conversion Rate</p>
                     <p className="text-2xl font-bold text-slate-800">
-                      {metrics.performanceInsights.subscription_analytics.conversion_rate}%
+                      {performanceMetrics?.conversion_rate || 0}%
                     </p>
                     <p className="text-xs text-slate-500">{formatNumber(metrics.performanceInsights.subscription_analytics.total_subscribers)} subscribers</p>
                   </div>
@@ -754,7 +876,7 @@ export function EnhancedMarketingDashboard() {
                   <div>
                     <p className="text-sm text-slate-600 mb-1">Retention Rate</p>
                     <p className="text-2xl font-bold text-slate-800">
-                      {metrics.performanceInsights.growth_indicators.retention_rate_7d}%
+                      {performanceMetrics?.retention_rate || 0}%
                     </p>
                     <p className="text-xs text-slate-500">7-day retention</p>
                   </div>
@@ -767,9 +889,9 @@ export function EnhancedMarketingDashboard() {
                   <div>
                     <p className="text-sm text-slate-600 mb-1">New Users (7d)</p>
                     <p className="text-2xl font-bold text-slate-800">
-                      {formatNumber(metrics.performanceInsights.growth_indicators.new_users_last_7_days)}
+                      {userMetrics?.new_users_7d || 0}
                     </p>
-                    <p className="text-xs text-slate-500">vs {formatNumber(metrics.performanceInsights.growth_indicators.new_users_last_30_days)} (30d)</p>
+                    <p className="text-xs text-slate-500">vs {userMetrics?.new_users_30d || 0} (30d)</p>
                   </div>
                   <UserPlus className="w-8 h-8 text-purple-500" />
                 </div>
@@ -780,9 +902,9 @@ export function EnhancedMarketingDashboard() {
                   <div>
                     <p className="text-sm text-slate-600 mb-1">Feedback Quality</p>
                     <p className="text-2xl font-bold text-slate-800">
-                      {metrics.performanceInsights.feedback_quality.positive_feedback_rate}%
+                      {performanceMetrics?.feedback_quality || 0}%
                     </p>
-                    <p className="text-xs text-slate-500">{formatNumber(metrics.performanceInsights.feedback_quality.total_feedback_responses)} responses</p>
+                    <p className="text-xs text-slate-500">Positive feedback</p>
                   </div>
                   <Star className="w-8 h-8 text-yellow-500" />
                 </div>
@@ -847,6 +969,241 @@ export function EnhancedMarketingDashboard() {
         {/* Analytics Tab */}
         {activeTab === 'analytics' && (
           <RealAnalyticsDashboard days={selectedTimeRange} />
+        )}
+
+        {/* Database Browser Tab */}
+        {activeTab === 'database' && (
+          <>
+            {/* Database Tables Overview */}
+            <div className="mb-6">
+              <h3 className="text-xl font-semibold text-slate-800 mb-4">Database Tables</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {databaseTables.map((table) => (
+                  <GlassCard 
+                    key={table.name} 
+                    className="p-4 hover cursor-pointer"
+                    onClick={() => {
+                      setSelectedTable(table.name)
+                      fetchTableData(table.name)
+                    }}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-semibold text-slate-800">{table.displayName}</h4>
+                      <div className={`w-3 h-3 rounded-full ${selectedTable === table.name ? 'bg-blue-500' : 'bg-slate-300'}`}></div>
+                    </div>
+                    <p className="text-sm text-slate-600 mb-2">{table.description}</p>
+                    <p className="text-xs text-slate-500 font-mono">{table.name}</p>
+                  </GlassCard>
+                ))}
+              </div>
+            </div>
+
+            {/* Table Data Browser */}
+            {selectedTable && (
+              <div className="mb-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-xl font-semibold text-slate-800">
+                    {databaseTables.find(t => t.name === selectedTable)?.displayName} Data
+                  </h3>
+                  <div className="flex items-center space-x-3">
+                    <input
+                      type="text"
+                      placeholder="Search..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <button
+                      onClick={() => fetchTableData(selectedTable)}
+                      disabled={databaseLoading}
+                      className="glass-button px-3 py-2 rounded-lg text-sm disabled:opacity-50"
+                    >
+                      <RefreshCw className={`w-4 h-4 ${databaseLoading ? 'animate-spin' : ''}`} />
+                    </button>
+                  </div>
+                </div>
+
+                {databaseLoading ? (
+                  <GlassCard className="p-6">
+                    <div className="flex items-center justify-center py-8">
+                      <RefreshCw className="w-6 h-6 animate-spin text-blue-500" />
+                      <span className="ml-2 text-slate-600">Loading data...</span>
+                    </div>
+                  </GlassCard>
+                ) : (
+                  <GlassCard className="p-4">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-slate-200">
+                            {tableData.length > 0 && Object.keys(tableData[0]).map((key) => (
+                              <th key={key} className="text-left py-2 px-3 font-semibold text-slate-700">
+                                {key}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {tableData
+                            .filter((row) => 
+                              searchTerm === '' || 
+                              Object.values(row).some(value => 
+                                String(value).toLowerCase().includes(searchTerm.toLowerCase())
+                              )
+                            )
+                            .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+                            .map((row, index) => (
+                            <tr key={index} className="border-b border-slate-100 hover:bg-slate-50">
+                              {Object.entries(row).map(([key, value]) => (
+                                <td key={key} className="py-2 px-3 text-slate-600">
+                                  {key === 'user_id' || key === 'uid' ? (
+                                    <button
+                                      onClick={() => {
+                                        setSelectedUser(row)
+                                        fetchUserEvaluations(String(value))
+                                      }}
+                                      className="text-blue-600 hover:text-blue-800 underline"
+                                    >
+                                      {String(value).substring(0, 8)}...
+                                    </button>
+                                  ) : key === 'email' ? (
+                                    <span className="font-medium text-slate-800">{String(value)}</span>
+                                  ) : (
+                                    <span className="max-w-xs truncate block">
+                                      {String(value).length > 50 ? `${String(value).substring(0, 50)}...` : String(value)}
+                                    </span>
+                                  )}
+                                </td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Pagination */}
+                    {tableData.length > itemsPerPage && (
+                      <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-200">
+                        <div className="text-sm text-slate-600">
+                          Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, tableData.length)} of {tableData.length} entries
+                        </div>
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                            disabled={currentPage === 1}
+                            className="glass-button px-3 py-1 rounded text-sm disabled:opacity-50"
+                          >
+                            Previous
+                          </button>
+                          <button
+                            onClick={() => setCurrentPage(currentPage + 1)}
+                            disabled={currentPage * itemsPerPage >= tableData.length}
+                            className="glass-button px-3 py-1 rounded text-sm disabled:opacity-50"
+                          >
+                            Next
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </GlassCard>
+                )}
+              </div>
+            )}
+
+            {/* User Details Modal */}
+            {selectedUser && (
+              <div className="mb-6">
+                <GlassCard className="p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-xl font-semibold text-slate-800">User Details</h3>
+                    <button
+                      onClick={() => setSelectedUser(null)}
+                      className="text-slate-500 hover:text-slate-700"
+                    >
+                      <XCircle className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    <div>
+                      <h4 className="font-semibold text-slate-700 mb-2">User Information</h4>
+                      <div className="space-y-2 text-sm">
+                        <div><span className="font-medium">Email:</span> {selectedUser.email || 'N/A'}</div>
+                        <div><span className="font-medium">UID:</span> {selectedUser.uid || selectedUser.user_id || 'N/A'}</div>
+                        <div><span className="font-medium">Display Name:</span> {selectedUser.display_name || 'N/A'}</div>
+                        <div><span className="font-medium">Academic Level:</span> {selectedUser.academic_level || 'N/A'}</div>
+                        <div><span className="font-medium">Created:</span> {selectedUser.created_at ? new Date(selectedUser.created_at).toLocaleDateString() : 'N/A'}</div>
+                      </div>
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-slate-700 mb-2">Activity Stats</h4>
+                      <div className="space-y-2 text-sm">
+                        <div><span className="font-medium">Questions Marked:</span> {selectedUser.questions_marked || 0}</div>
+                        <div><span className="font-medium">Credits:</span> {selectedUser.credits || 0}</div>
+                        <div><span className="font-medium">Current Plan:</span> {selectedUser.current_plan || 'free'}</div>
+                        <div><span className="font-medium">Subscription Status:</span> {selectedUser.subscription_status || 'free'}</div>
+                        <div><span className="font-medium">Launch User:</span> {selectedUser.is_launch_user ? 'Yes' : 'No'}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* User Evaluations */}
+                  <div>
+                    <h4 className="font-semibold text-slate-700 mb-3">Recent Evaluations ({userEvaluations.length})</h4>
+                    {userEvaluations.length > 0 ? (
+                      <div className="space-y-3">
+                        {userEvaluations.slice(0, 5).map((evaluation, index) => (
+                          <div key={index} className="glass-panel p-4 rounded-lg">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="font-medium text-slate-800">
+                                {evaluation.question_type || 'Unknown Type'}
+                              </span>
+                              <span className="text-sm text-slate-500">
+                                {evaluation.timestamp ? new Date(evaluation.timestamp).toLocaleDateString() : 'N/A'}
+                              </span>
+                            </div>
+                            <div className="text-sm text-slate-600 mb-2">
+                              <span className="font-medium">Grade:</span> {evaluation.grade || 'N/A'}
+                            </div>
+                            {evaluation.student_response && (
+                              <div className="text-sm text-slate-600">
+                                <span className="font-medium">Response:</span> 
+                                <p className="mt-1 p-2 bg-slate-50 rounded text-xs">
+                                  {evaluation.student_response.length > 200 
+                                    ? `${evaluation.student_response.substring(0, 200)}...` 
+                                    : evaluation.student_response}
+                                </p>
+                              </div>
+                            )}
+                            {evaluation.feedback && (
+                              <div className="text-sm text-slate-600 mt-2">
+                                <span className="font-medium">Feedback:</span>
+                                <p className="mt-1 p-2 bg-blue-50 rounded text-xs">
+                                  {evaluation.feedback.length > 200 
+                                    ? `${evaluation.feedback.substring(0, 200)}...` 
+                                    : evaluation.feedback}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                        {userEvaluations.length > 5 && (
+                          <div className="text-center text-sm text-slate-500">
+                            ... and {userEvaluations.length - 5} more evaluations
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 text-slate-500">
+                        <FileText className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                        <p>No evaluations found for this user</p>
+                      </div>
+                    )}
+                  </div>
+                </GlassCard>
+              </div>
+            )}
+          </>
         )}
       </GlassCard>
 

@@ -461,7 +461,7 @@ export function SuperNotes() {
       {filteredNotes.length > 0 && (
         <div className="mobile-space-y">
           <h3 className="mobile-subheading text-slate-800">Your Super Notes</h3>
-          <div className="mobile-grid">
+          <div className="space-y-4">
             {filteredNotes.map((note) => (
               <GlassCard 
                 key={note.id} 
@@ -616,16 +616,6 @@ export function SuperNotes() {
                         </div>
                       )}
 
-                      {/* Test content to make it scrollable */}
-                      <div className="space-y-2">
-                        <h3 className="text-lg font-semibold text-slate-800">Test Content for Scrolling</h3>
-                        {Array.from({ length: 20 }, (_, i) => (
-                          <div key={i} className="p-4 bg-slate-50 rounded-lg">
-                            <h4 className="font-medium text-slate-700">Test Item {i + 1}</h4>
-                            <p className="text-sm text-slate-600">This is test content to make the modal scrollable. Lorem ipsum dolor sit amet, consectetur adipiscing elit.</p>
-                          </div>
-                        ))}
-                      </div>
 
                       {/* Sub-Notes */}
                       <div>
