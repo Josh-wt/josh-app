@@ -121,11 +121,38 @@ export function EnhancedMarketingDashboard() {
   
   // Advanced sorting and filtering
   const [sortConfig, setSortConfig] = useState<{key: string, direction: 'asc' | 'desc'} | null>(null)
+  const [multiSortConfig, setMultiSortConfig] = useState<Array<{key: string, direction: 'asc' | 'desc'}>>([])
   const [columnFilters, setColumnFilters] = useState<Record<string, string>>({})
+  const [advancedFilters, setAdvancedFilters] = useState<Record<string, any>>({})
+  const [filterGroups, setFilterGroups] = useState<Array<{id: string, filters: Record<string, any>, operator: 'AND' | 'OR'}>>([])
   const [showColumnFilters, setShowColumnFilters] = useState(false)
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
   const [selectedColumns, setSelectedColumns] = useState<string[]>([])
   const [tableSchema, setTableSchema] = useState<any>(null)
   const [exportFormat, setExportFormat] = useState<'csv' | 'json'>('csv')
+  
+  // User search and details
+  const [userSearchTerm, setUserSearchTerm] = useState('')
+  const [userSearchResults, setUserSearchResults] = useState<any[]>([])
+  const [selectedUserDetails, setSelectedUserDetails] = useState<any>(null)
+  const [userRelatedData, setUserRelatedData] = useState<{
+    evaluations: any[]
+    goals: any[]
+    streaks: any[]
+    resources: any[]
+    subscriptions: any[]
+  }>({
+    evaluations: [],
+    goals: [],
+    streaks: [],
+    resources: [],
+    subscriptions: []
+  })
+  
+  // Quick filters and saved searches
+  const [quickFilters, setQuickFilters] = useState<Record<string, any>>({})
+  const [savedSearches, setSavedSearches] = useState<Array<{name: string, filters: any}>>([])
+  const [activeQuickFilter, setActiveQuickFilter] = useState<string | null>(null)
 
   const fetchMetrics = async (timeRange: number = selectedTimeRange) => {
     try {
@@ -324,13 +351,98 @@ export function EnhancedMarketingDashboard() {
     fetchAnalyticsData(timeRange)
   }
 
-  // Advanced sorting function
-  const handleSort = (key: string) => {
-    let direction: 'asc' | 'desc' = 'asc'
-    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
-      direction = 'desc'
+  // Advanced sorting functions
+  const handleSort = (key: string, multiSort: boolean = false) => {
+    if (multiSort) {
+      // Multi-column sorting
+      const existingSort = multiSortConfig.find(sort => sort.key === key)
+      if (existingSort) {
+        if (existingSort.direction === 'asc') {
+          setMultiSortConfig(prev => prev.map(sort => 
+            sort.key === key ? { ...sort, direction: 'desc' as const } : sort
+          ))
+        } else {
+          setMultiSortConfig(prev => prev.filter(sort => sort.key !== key))
+        }
+      } else {
+        setMultiSortConfig(prev => [...prev, { key, direction: 'asc' as const }])
+      }
+    } else {
+      // Single column sorting
+      let direction: 'asc' | 'desc' = 'asc'
+      if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+        direction = 'desc'
+      }
+      setSortConfig({ key, direction })
+      setMultiSortConfig([]) // Clear multi-sort when using single sort
     }
-    setSortConfig({ key, direction })
+  }
+
+  // Advanced user search
+  const searchUsers = async (searchTerm: string) => {
+    if (!searchTerm.trim()) {
+      setUserSearchResults([])
+      return
+    }
+
+    try {
+      setDatabaseLoading(true)
+      
+      // Search across multiple user-related tables
+      const [usersResult, evaluationsResult] = await Promise.all([
+        everythingEnglishClient
+          .from('assessment_users')
+          .select('*')
+          .or(`id.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%,full_name.ilike.%${searchTerm}%`)
+          .limit(20),
+        
+        everythingEnglishClient
+          .from('assessment_evaluations')
+          .select('user_id, score, created_at')
+          .ilike('user_id', `%${searchTerm}%`)
+          .limit(20)
+      ])
+
+      const combinedResults = [
+        ...(usersResult.data || []).map(user => ({ ...user, type: 'user' })),
+        ...(evaluationsResult.data || []).map(evaluation => ({ ...evaluation, type: 'evaluation' }))
+      ]
+
+      setUserSearchResults(combinedResults)
+    } catch (error) {
+      console.error('User search error:', error)
+    } finally {
+      setDatabaseLoading(false)
+    }
+  }
+
+  // Fetch comprehensive user details
+  const fetchUserDetails = async (userId: string) => {
+    try {
+      setDatabaseLoading(true)
+      
+      const [userResult, evaluationsResult, goalsResult, streaksResult, resourcesResult, subscriptionsResult] = await Promise.all([
+        everythingEnglishClient.from('assessment_users').select('*').eq('id', userId).single(),
+        everythingEnglishClient.from('assessment_evaluations').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
+        everythingEnglishClient.from('study_goals').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
+        everythingEnglishClient.from('study_streaks').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
+        everythingEnglishClient.from('saved_resources').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
+        everythingEnglishClient.from('subscriptions').select('*').eq('user_id', userId).order('created_at', { ascending: false })
+      ])
+
+      setSelectedUserDetails(userResult.data)
+      setUserRelatedData({
+        evaluations: evaluationsResult.data || [],
+        goals: goalsResult.data || [],
+        streaks: streaksResult.data || [],
+        resources: resourcesResult.data || [],
+        subscriptions: subscriptionsResult.data || []
+      })
+    } catch (error) {
+      console.error('Error fetching user details:', error)
+    } finally {
+      setDatabaseLoading(false)
+    }
   }
 
   // Advanced filtering functions
@@ -341,17 +453,103 @@ export function EnhancedMarketingDashboard() {
     }))
   }
 
-  const clearAllFilters = () => {
-    setColumnFilters({})
-    setSearchTerm('')
-    setSortConfig(null)
+  const handleAdvancedFilter = (column: string, filterType: string, value: any) => {
+    setAdvancedFilters(prev => ({
+      ...prev,
+      [column]: { type: filterType, value }
+    }))
   }
 
-  // Process and filter data
+  const addFilterGroup = () => {
+    const newGroup = {
+      id: `group_${Date.now()}`,
+      filters: {},
+      operator: 'AND' as const
+    }
+    setFilterGroups(prev => [...prev, newGroup])
+  }
+
+  const removeFilterGroup = (groupId: string) => {
+    setFilterGroups(prev => prev.filter(group => group.id !== groupId))
+  }
+
+  const updateFilterGroup = (groupId: string, filters: Record<string, any>) => {
+    setFilterGroups(prev => prev.map(group => 
+      group.id === groupId ? { ...group, filters } : group
+    ))
+  }
+
+  // Click-to-filter functionality
+  const handleCellClick = (column: string, value: any) => {
+    if (column === 'user_id' || column === 'uid') {
+      fetchUserDetails(String(value))
+      return
+    }
+    
+    // Add click-to-filter
+    setColumnFilters(prev => ({
+      ...prev,
+      [column]: String(value)
+    }))
+  }
+
+  // Quick filter presets
+  const applyQuickFilter = (filterName: string) => {
+    const presets: Record<string, any> = {
+      'active_users': { subscription_status: 'active' },
+      'recent_evaluations': { created_at: { type: 'date_range', value: { start: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), end: new Date() } } },
+      'high_scores': { score: { type: 'greater_than', value: 80 } },
+      'new_users': { created_at: { type: 'date_range', value: { start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), end: new Date() } } },
+      'premium_users': { subscription_status: 'premium' }
+    }
+    
+    if (presets[filterName]) {
+      setAdvancedFilters(presets[filterName])
+      setActiveQuickFilter(filterName)
+    }
+  }
+
+  const saveCurrentSearch = (name: string) => {
+    const currentFilters = {
+      columnFilters,
+      advancedFilters,
+      filterGroups,
+      searchTerm,
+      sortConfig,
+      multiSortConfig
+    }
+    setSavedSearches(prev => [...prev, { name, filters: currentFilters }])
+  }
+
+  const loadSavedSearch = (searchName: string) => {
+    const savedSearch = savedSearches.find(search => search.name === searchName)
+    if (savedSearch) {
+      setColumnFilters(savedSearch.filters.columnFilters)
+      setAdvancedFilters(savedSearch.filters.advancedFilters)
+      setFilterGroups(savedSearch.filters.filterGroups)
+      setSearchTerm(savedSearch.filters.searchTerm)
+      setSortConfig(savedSearch.filters.sortConfig)
+      setMultiSortConfig(savedSearch.filters.multiSortConfig)
+    }
+  }
+
+  const clearAllFilters = () => {
+    setColumnFilters({})
+    setAdvancedFilters({})
+    setFilterGroups([])
+    setSearchTerm('')
+    setUserSearchTerm('')
+    setUserSearchResults([])
+    setSortConfig(null)
+    setMultiSortConfig([])
+    setActiveQuickFilter(null)
+  }
+
+  // Process and filter data with advanced filtering
   const processedTableData = useMemo(() => {
     let filtered = [...tableData]
 
-    // Apply search term
+    // Apply global search term
     if (searchTerm) {
       filtered = filtered.filter(row =>
         Object.values(row).some(value =>
@@ -369,8 +567,95 @@ export function EnhancedMarketingDashboard() {
       }
     })
 
-    // Apply sorting
-    if (sortConfig) {
+    // Apply advanced filters
+    Object.entries(advancedFilters).forEach(([column, filter]) => {
+      if (filter && filter.value !== undefined && filter.value !== '') {
+        filtered = filtered.filter(row => {
+          const cellValue = row[column]
+          const filterValue = filter.value
+
+          switch (filter.type) {
+            case 'equals':
+              return String(cellValue).toLowerCase() === String(filterValue).toLowerCase()
+            case 'contains':
+              return String(cellValue).toLowerCase().includes(String(filterValue).toLowerCase())
+            case 'starts_with':
+              return String(cellValue).toLowerCase().startsWith(String(filterValue).toLowerCase())
+            case 'ends_with':
+              return String(cellValue).toLowerCase().endsWith(String(filterValue).toLowerCase())
+            case 'greater_than':
+              return Number(cellValue) > Number(filterValue)
+            case 'less_than':
+              return Number(cellValue) < Number(filterValue)
+            case 'date_range':
+              if (filterValue.start && filterValue.end) {
+                const cellDate = new Date(cellValue)
+                return cellDate >= new Date(filterValue.start) && cellDate <= new Date(filterValue.end)
+              }
+              return true
+            case 'in_list':
+              return Array.isArray(filterValue) && filterValue.includes(cellValue)
+            default:
+              return true
+          }
+        })
+      }
+    })
+
+    // Apply filter groups
+    filterGroups.forEach(group => {
+      const groupResults = Object.entries(group.filters).map(([column, filter]) => {
+        return filtered.filter(row => {
+          const cellValue = row[column]
+          const filterValue = filter.value
+
+          switch (filter.type) {
+            case 'equals':
+              return String(cellValue).toLowerCase() === String(filterValue).toLowerCase()
+            case 'contains':
+              return String(cellValue).toLowerCase().includes(String(filterValue).toLowerCase())
+            case 'greater_than':
+              return Number(cellValue) > Number(filterValue)
+            case 'less_than':
+              return Number(cellValue) < Number(filterValue)
+            default:
+              return true
+          }
+        })
+      })
+
+      if (group.operator === 'AND') {
+        // Intersection of all group results
+        filtered = groupResults.reduce((acc, curr) => 
+          acc.filter(item => curr.some(currItem => JSON.stringify(currItem) === JSON.stringify(item)))
+        )
+      } else {
+        // Union of all group results
+        const unionSet = new Set()
+        groupResults.forEach(result => {
+          result.forEach(item => unionSet.add(JSON.stringify(item)))
+        })
+        filtered = Array.from(unionSet).map(item => JSON.parse(item as string))
+      }
+    })
+
+    // Apply sorting (multi-column or single)
+    if (multiSortConfig.length > 0) {
+      filtered.sort((a, b) => {
+        for (const sort of multiSortConfig) {
+          const aVal = a[sort.key]
+          const bVal = b[sort.key]
+          
+          if (aVal < bVal) {
+            return sort.direction === 'asc' ? -1 : 1
+          }
+          if (aVal > bVal) {
+            return sort.direction === 'asc' ? 1 : -1
+          }
+        }
+        return 0
+      })
+    } else if (sortConfig) {
       filtered.sort((a, b) => {
         const aVal = a[sortConfig.key]
         const bVal = b[sortConfig.key]
@@ -386,7 +671,7 @@ export function EnhancedMarketingDashboard() {
     }
 
     return filtered
-  }, [tableData, searchTerm, columnFilters, sortConfig])
+  }, [tableData, searchTerm, columnFilters, advancedFilters, filterGroups, sortConfig, multiSortConfig])
 
   // Export functions
   const exportTableData = (format: 'csv' | 'json') => {
@@ -1262,7 +1547,7 @@ export function EnhancedMarketingDashboard() {
 
                 {/* Advanced Search and Filters */}
                 <GlassCard className="p-4 mb-4">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-2">Global Search</label>
                       <div className="relative">
@@ -1272,6 +1557,22 @@ export function EnhancedMarketingDashboard() {
                           placeholder="Search all columns..."
                           value={searchTerm}
                           onChange={(e) => setSearchTerm(e.target.value)}
+                          className="w-full pl-10 pr-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">User Search</label>
+                      <div className="relative">
+                        <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+                        <input
+                          type="text"
+                          placeholder="Search by user ID, email, name..."
+                          value={userSearchTerm}
+                          onChange={(e) => {
+                            setUserSearchTerm(e.target.value)
+                            searchUsers(e.target.value)
+                          }}
                           className="w-full pl-10 pr-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                       </div>
@@ -1301,7 +1602,175 @@ export function EnhancedMarketingDashboard() {
                       </select>
                     </div>
                   </div>
+
+                  {/* Quick Filters */}
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Quick Filters</label>
+                    <div className="flex flex-wrap gap-2">
+                      {['active_users', 'recent_evaluations', 'high_scores', 'new_users', 'premium_users'].map((filter) => (
+                        <button
+                          key={filter}
+                          onClick={() => applyQuickFilter(filter)}
+                          className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                            activeQuickFilter === filter
+                              ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                          }`}
+                        >
+                          {filter.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Advanced Filter Toggle */}
+                  <div className="flex items-center justify-between">
+                    <button
+                      onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                      className="flex items-center space-x-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm transition-colors"
+                    >
+                      <Settings className="w-4 h-4" />
+                      <span>Advanced Filters</span>
+                      {showAdvancedFilters ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                    </button>
+                    
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => {
+                          const name = prompt('Enter search name:')
+                          if (name) saveCurrentSearch(name)
+                        }}
+                        className="px-3 py-1 bg-green-100 text-green-800 rounded text-xs hover:bg-green-200"
+                      >
+                        Save Search
+                      </button>
+                      <button
+                        onClick={clearAllFilters}
+                        className="px-3 py-1 bg-red-100 text-red-800 rounded text-xs hover:bg-red-200"
+                      >
+                        Clear All
+                      </button>
+                    </div>
+                  </div>
                 </GlassCard>
+
+                {/* User Search Results */}
+                {userSearchResults.length > 0 && (
+                  <GlassCard className="p-4 mb-4">
+                    <h4 className="font-medium text-slate-700 mb-3">User Search Results</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {userSearchResults.map((result, index) => (
+                        <div
+                          key={index}
+                          className="p-3 border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer"
+                          onClick={() => {
+                            if (result.type === 'user') {
+                              fetchUserDetails(result.id)
+                            }
+                          }}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="font-medium text-slate-800">
+                                {result.type === 'user' ? result.full_name || result.email : `Evaluation: ${result.user_id}`}
+                              </p>
+                              <p className="text-xs text-slate-500">
+                                {result.type === 'user' ? result.email : `Score: ${result.score}`}
+                              </p>
+                            </div>
+                            <span className={`px-2 py-1 rounded-full text-xs ${
+                              result.type === 'user' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
+                            }`}>
+                              {result.type}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </GlassCard>
+                )}
+
+                {/* Advanced Filters Panel */}
+                {showAdvancedFilters && tableData.length > 0 && (
+                  <GlassCard className="p-4 mb-4">
+                    <h4 className="font-medium text-slate-700 mb-4">Advanced Filters</h4>
+                    
+                    {/* Filter Groups */}
+                    {filterGroups.map((group, groupIndex) => (
+                      <div key={group.id} className="mb-4 p-3 border border-slate-200 rounded-lg">
+                        <div className="flex items-center justify-between mb-3">
+                          <h5 className="font-medium text-slate-600">Filter Group {groupIndex + 1}</h5>
+                          <div className="flex items-center space-x-2">
+                            <select
+                              value={group.operator}
+                              onChange={(e) => setFilterGroups(prev => prev.map(g => 
+                                g.id === group.id ? { ...g, operator: e.target.value as 'AND' | 'OR' } : g
+                              ))}
+                              className="px-2 py-1 border border-slate-200 rounded text-xs"
+                            >
+                              <option value="AND">AND</option>
+                              <option value="OR">OR</option>
+                            </select>
+                            <button
+                              onClick={() => removeFilterGroup(group.id)}
+                              className="text-red-500 hover:text-red-700"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                          {Object.keys(tableData[0] || {}).map((column) => (
+                            <div key={column}>
+                              <label className="block text-xs font-medium text-slate-600 mb-1">{column}</label>
+                              <div className="flex space-x-1">
+                                <select
+                                  onChange={(e) => {
+                                    const filterType = e.target.value
+                                    updateFilterGroup(group.id, {
+                                      ...group.filters,
+                                      [column]: { type: filterType, value: '' }
+                                    })
+                                  }}
+                                  className="px-2 py-1 border border-slate-200 rounded text-xs flex-1"
+                                >
+                                  <option value="">Select filter...</option>
+                                  <option value="equals">Equals</option>
+                                  <option value="contains">Contains</option>
+                                  <option value="starts_with">Starts with</option>
+                                  <option value="ends_with">Ends with</option>
+                                  <option value="greater_than">Greater than</option>
+                                  <option value="less_than">Less than</option>
+                                </select>
+                                <input
+                                  type="text"
+                                  placeholder="Value"
+                                  onChange={(e) => {
+                                    const currentFilter = group.filters[column] || { type: '', value: '' }
+                                    updateFilterGroup(group.id, {
+                                      ...group.filters,
+                                      [column]: { ...currentFilter, value: e.target.value }
+                                    })
+                                  }}
+                                  className="px-2 py-1 border border-slate-200 rounded text-xs flex-1"
+                                />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                    
+                    <button
+                      onClick={addFilterGroup}
+                      className="flex items-center space-x-2 px-3 py-2 bg-blue-100 text-blue-800 rounded-lg text-sm hover:bg-blue-200"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>Add Filter Group</span>
+                    </button>
+                  </GlassCard>
+                )}
 
                 {databaseLoading ? (
                   <GlassCard className="p-6">
@@ -1346,16 +1815,37 @@ export function EnhancedMarketingDashboard() {
                             {(selectedColumns.length > 0 ? selectedColumns : (tableData.length > 0 ? Object.keys(tableData[0]) : [])).map((key) => (
                               <th 
                                 key={key} 
-                                className="text-left py-3 px-3 font-semibold text-slate-700 cursor-pointer hover:bg-slate-50 select-none"
-                                onClick={() => handleSort(key)}
+                                className="text-left py-3 px-3 font-semibold text-slate-700 cursor-pointer hover:bg-slate-50 select-none group"
                               >
-                                <div className="flex items-center space-x-2">
-                                  <span>{key}</span>
-                                  {sortConfig && sortConfig.key === key && (
-                                    sortConfig.direction === 'asc' ? 
-                                    <ChevronUp className="w-4 h-4" /> : 
-                                    <ChevronDown className="w-4 h-4" />
-                                  )}
+                                <div className="flex items-center justify-between">
+                                  <div 
+                                    className="flex items-center space-x-2 flex-1"
+                                    onClick={() => handleSort(key)}
+                                  >
+                                    <span>{key}</span>
+                                    {sortConfig && sortConfig.key === key && (
+                                      sortConfig.direction === 'asc' ? 
+                                      <ChevronUp className="w-4 h-4" /> : 
+                                      <ChevronDown className="w-4 h-4" />
+                                    )}
+                                    {multiSortConfig.find(sort => sort.key === key) && (
+                                      <span className="text-xs bg-blue-100 text-blue-800 px-1 rounded">
+                                        {multiSortConfig.findIndex(sort => sort.key === key) + 1}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        handleSort(key, true)
+                                      }}
+                                      className="p-1 hover:bg-slate-200 rounded"
+                                      title="Multi-sort"
+                                    >
+                                      <MoreHorizontal className="w-3 h-3" />
+                                    </button>
+                                  </div>
                                 </div>
                               </th>
                             ))}
@@ -1367,12 +1857,17 @@ export function EnhancedMarketingDashboard() {
                             .map((row, index) => (
                             <tr key={index} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
                               {(selectedColumns.length > 0 ? selectedColumns : Object.keys(row)).map((key) => (
-                                <td key={key} className="py-3 px-3 text-slate-600">
+                                <td 
+                                  key={key} 
+                                  className="py-3 px-3 text-slate-600 cursor-pointer hover:bg-slate-100 transition-colors group relative"
+                                  onClick={() => handleCellClick(key, row[key])}
+                                  title={`Click to filter by: ${String(row[key])}`}
+                                >
                                   {key === 'user_id' || key === 'uid' ? (
                                     <button
-                                      onClick={() => {
-                                        setSelectedUser(row)
-                                        fetchUserEvaluations(String(row[key]))
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        fetchUserDetails(String(row[key]))
                                       }}
                                       className="text-blue-600 hover:text-blue-800 underline font-mono text-xs"
                                     >
@@ -1382,6 +1877,7 @@ export function EnhancedMarketingDashboard() {
                                     <a 
                                       href={`mailto:${row[key]}`} 
                                       className="text-blue-600 hover:text-blue-800 underline"
+                                      onClick={(e) => e.stopPropagation()}
                                     >
                                       {String(row[key])}
                                     </a>
@@ -1397,11 +1893,24 @@ export function EnhancedMarketingDashboard() {
                                     }`}>
                                       {String(row[key])}
                                     </span>
+                                  ) : key === 'score' ? (
+                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                      Number(row[key]) >= 80 ? 'bg-green-100 text-green-800' :
+                                      Number(row[key]) >= 60 ? 'bg-yellow-100 text-yellow-800' :
+                                      'bg-red-100 text-red-800'
+                                    }`}>
+                                      {String(row[key])}
+                                    </span>
                                   ) : (
                                     <span className="truncate max-w-xs block">
                                       {String(row[key])}
                                     </span>
                                   )}
+                                  
+                                  {/* Click-to-filter indicator */}
+                                  <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <Filter className="w-3 h-3 text-slate-400" />
+                                  </div>
                                 </td>
                               ))}
                             </tr>
@@ -1440,41 +1949,92 @@ export function EnhancedMarketingDashboard() {
               </div>
             )}
 
-            {/* User Details Modal */}
-            {selectedUser && (
+            {/* Comprehensive User Details Modal */}
+            {selectedUserDetails && (
               <div className="mb-6">
                 <GlassCard className="p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-xl font-semibold text-slate-800">User Details</h3>
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center space-x-4">
+                      <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                        <User className="w-6 h-6 text-blue-600" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-semibold text-slate-800">
+                          {selectedUserDetails.full_name || selectedUserDetails.email}
+                        </h3>
+                        <p className="text-slate-600">{selectedUserDetails.email}</p>
+                      </div>
+                    </div>
                     <button
-                      onClick={() => setSelectedUser(null)}
-                      className="text-slate-500 hover:text-slate-700"
+                      onClick={() => {
+                        setSelectedUserDetails(null)
+                        setUserRelatedData({
+                          evaluations: [],
+                          goals: [],
+                          streaks: [],
+                          resources: [],
+                          subscriptions: []
+                        })
+                      }}
+                      className="text-slate-500 hover:text-slate-700 p-2 hover:bg-slate-100 rounded-lg"
                     >
-                      <XCircle className="w-5 h-5" />
+                      <X className="w-5 h-5" />
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                    <div>
-                      <h4 className="font-semibold text-slate-700 mb-2">User Information</h4>
-                      <div className="space-y-2 text-sm">
-                        <div><span className="font-medium">Email:</span> {selectedUser.email || 'N/A'}</div>
-                        <div><span className="font-medium">UID:</span> {selectedUser.uid || selectedUser.user_id || 'N/A'}</div>
-                        <div><span className="font-medium">Display Name:</span> {selectedUser.display_name || 'N/A'}</div>
-                        <div><span className="font-medium">Academic Level:</span> {selectedUser.academic_level || 'N/A'}</div>
-                        <div><span className="font-medium">Created:</span> {selectedUser.created_at ? new Date(selectedUser.created_at).toLocaleDateString() : 'N/A'}</div>
+                  {/* User Overview Cards */}
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                    <GlassCard className="p-4">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                          <FileText className="w-5 h-5 text-green-600" />
+                        </div>
+                        <div>
+                          <p className="text-2xl font-bold text-slate-800">{userRelatedData.evaluations.length}</p>
+                          <p className="text-sm text-slate-600">Evaluations</p>
+                        </div>
                       </div>
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-slate-700 mb-2">Activity Stats</h4>
-                      <div className="space-y-2 text-sm">
-                        <div><span className="font-medium">Questions Marked:</span> {selectedUser.questions_marked || 0}</div>
-                        <div><span className="font-medium">Credits:</span> {selectedUser.credits || 0}</div>
-                        <div><span className="font-medium">Current Plan:</span> {selectedUser.current_plan || 'free'}</div>
-                        <div><span className="font-medium">Subscription Status:</span> {selectedUser.subscription_status || 'free'}</div>
-                        <div><span className="font-medium">Launch User:</span> {selectedUser.is_launch_user ? 'Yes' : 'No'}</div>
+                    </GlassCard>
+                    
+                    <GlassCard className="p-4">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                          <Target className="w-5 h-5 text-purple-600" />
+                        </div>
+                        <div>
+                          <p className="text-2xl font-bold text-slate-800">{userRelatedData.goals.length}</p>
+                          <p className="text-sm text-slate-600">Study Goals</p>
+                        </div>
                       </div>
-                    </div>
+                    </GlassCard>
+                    
+                    <GlassCard className="p-4">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
+                          <Zap className="w-5 h-5 text-orange-600" />
+                        </div>
+                        <div>
+                          <p className="text-2xl font-bold text-slate-800">
+                            {userRelatedData.streaks.length > 0 ? userRelatedData.streaks[0].current_streak : 0}
+                          </p>
+                          <p className="text-sm text-slate-600">Current Streak</p>
+                        </div>
+                      </div>
+                    </GlassCard>
+                    
+                    <GlassCard className="p-4">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
+                          <CreditCard className="w-5 h-5 text-emerald-600" />
+                        </div>
+                        <div>
+                          <p className="text-2xl font-bold text-slate-800">
+                            {userRelatedData.subscriptions.length > 0 ? userRelatedData.subscriptions[0].status : 'Free'}
+                          </p>
+                          <p className="text-sm text-slate-600">Subscription</p>
+                        </div>
+                      </div>
+                    </GlassCard>
                   </div>
 
                   {/* User Evaluations */}
