@@ -192,66 +192,131 @@ export function EnhancedMarketingDashboard() {
 
   const fetchComprehensiveMetrics = async () => {
     try {
-      // Fetch evaluation metrics
-      const evaluationResponse = await fetch('/api/analytics/evaluations')
-      if (evaluationResponse.ok) {
-        const evaluationData = await evaluationResponse.json()
-        setEvaluationMetrics(evaluationData)
+      console.log('🔍 [DEBUG] Starting fetchComprehensiveMetrics...')
+      
+      // Fetch evaluation metrics directly from Supabase
+      const { data: evaluationsData, error: evaluationsError } = await everythingEnglishClient
+        .from('assessment_evaluations')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(1000)
+
+      if (evaluationsError) {
+        console.error('❌ [ERROR] Error fetching evaluations:', evaluationsError)
+      } else {
+        console.log('🔍 [DEBUG] Fetched evaluations:', evaluationsData?.length || 0)
+        
+        // Calculate evaluation metrics
+        const totalEvaluations = evaluationsData?.length || 0
+        const recentEvaluations = evaluationsData?.filter(e => {
+          const thirtyDaysAgo = new Date()
+          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+          return new Date(e.created_at) > thirtyDaysAgo
+        }).length || 0
+        
+        // Calculate daily trends
+        const dailyTrends = evaluationsData?.reduce((acc, evaluation) => {
+          const date = new Date(evaluation.created_at).toISOString().split('T')[0]
+          if (!acc[date]) {
+            acc[date] = { date, evaluations: 0, unique_users: new Set() }
+          }
+          acc[date].evaluations++
+          acc[date].unique_users.add(evaluation.user_id)
+          return acc
+        }, {} as Record<string, { date: string; evaluations: number; unique_users: Set<string> }>)
+        
+        const dailyTrendsArray = Object.values(dailyTrends || {}).map(trend => ({
+          date: trend.date,
+          evaluations: trend.evaluations,
+          unique_users: trend.unique_users.size
+        })).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+
+        setEvaluationMetrics({
+          total_evaluations: totalEvaluations,
+          recent_evaluations: recentEvaluations,
+          return_users: 0, // TODO: Calculate this
+          return_rate: 0, // TODO: Calculate this
+          avg_evaluations_per_user: totalEvaluations > 0 ? totalEvaluations / (new Set(evaluationsData?.map(e => e.user_id)).size) : 0,
+          daily_trends: dailyTrendsArray
+        })
       }
 
-      // Fetch user metrics
-      const userResponse = await fetch('/api/analytics/users')
-      if (userResponse.ok) {
-        const userData = await userResponse.json()
-        setUserMetrics(userData)
+      // Fetch user metrics directly from Supabase
+      const { data: usersData, error: usersError } = await everythingEnglishClient
+        .from('assessment_users')
+        .select('*')
+        .order('created_at', { ascending: false })
+
+      if (usersError) {
+        console.error('❌ [ERROR] Error fetching users:', usersError)
+      } else {
+        console.log('🔍 [DEBUG] Fetched users:', usersData?.length || 0)
+        
+        setUserMetrics({
+          total_users: usersData?.length || 0,
+          active_users: 0, // TODO: Calculate this
+          new_users: 0 // TODO: Calculate this
+        })
       }
 
-      // Fetch engagement metrics
-      const engagementResponse = await fetch('/api/analytics/engagement')
-      if (engagementResponse.ok) {
-        const engagementData = await engagementResponse.json()
-        setEngagementMetrics(engagementData)
-      }
+      // Set placeholder data for engagement and performance metrics
+      setEngagementMetrics({
+        engagement_score: 0,
+        active_sessions: 0
+      })
 
-      // Fetch performance metrics
-      const performanceResponse = await fetch('/api/analytics/performance')
-      if (performanceResponse.ok) {
-        const performanceData = await performanceResponse.json()
-        setPerformanceMetrics(performanceData)
-      }
+      setPerformanceMetrics({
+        feedback_quality: 0,
+        response_time: 0
+      })
+
     } catch (err) {
-      console.error('Failed to fetch comprehensive metrics:', err)
+      console.error('❌ [ERROR] Failed to fetch comprehensive metrics:', err)
     }
   }
 
   const fetchDatabaseTables = async () => {
     try {
       setDatabaseLoading(true)
-      console.log('Fetching database tables...')
+      console.log('🔍 [DEBUG] Starting fetchDatabaseTables...')
       
       const tables = await getDatabaseTables()
-      console.log('Fetched tables:', tables)
+      console.log('🔍 [DEBUG] Fetched tables:', tables)
       
-      // Get statistics for each table
+      if (!tables || tables.length === 0) {
+        console.warn('⚠️ [WARNING] No tables returned from API')
+        setDatabaseTables([])
+        return
+      }
+      
+      // Get statistics for each table (but don't fail if stats fail)
       const tablesWithStats = await Promise.all(
         tables.map(async (table) => {
           try {
+            console.log(`🔍 [DEBUG] Getting stats for table: ${table.name}`)
             const stats = await getTableStatistics(table.name)
+            console.log(`🔍 [DEBUG] Stats for ${table.name}:`, stats)
             return {
               ...table,
               rowCount: stats.rowCount,
               lastUpdated: stats.lastUpdated
             }
           } catch (error) {
-            console.error(`Error getting stats for ${table.name}:`, error)
-            return table
+            console.error(`❌ [ERROR] Error getting stats for ${table.name}:`, error)
+            return {
+              ...table,
+              rowCount: 0,
+              lastUpdated: new Date().toISOString()
+            }
           }
         })
       )
       
+      console.log('🔍 [DEBUG] Final tables with stats:', tablesWithStats)
       setDatabaseTables(tablesWithStats)
     } catch (err) {
-      console.error('Failed to fetch database tables:', err)
+      console.error('❌ [ERROR] Failed to fetch database tables:', err)
+      setDatabaseTables([])
     } finally {
       setDatabaseLoading(false)
     }
@@ -1425,15 +1490,19 @@ export function EnhancedMarketingDashboard() {
                     }`}></div>
                     <span>{connectionStatus.connected ? 'Live Connection' : 'Connection Error'}</span>
                   </div>
-                  <button
-                    onClick={testConnection}
-                    className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs hover:bg-blue-200"
-                  >
-                    Test
-                  </button>
                 </div>
               </div>
               
+              {/* Debug Information */}
+              <div className="mb-4 p-3 bg-slate-100 rounded-lg">
+                <div className="text-xs text-slate-600">
+                  <strong>Debug Info:</strong> Tables loaded: {databaseTables.length} | 
+                  Connection: {connectionStatus.connected ? '✅ Connected' : '❌ Failed'} |
+                  Loading: {databaseLoading ? '⏳ Loading...' : '✅ Complete'}
+                  {connectionStatus.error && <span className="text-red-600"> | Error: {connectionStatus.error}</span>}
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {databaseTables.map((table) => (
                   <GlassCard 

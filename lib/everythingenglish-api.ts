@@ -415,6 +415,8 @@ export interface UserProfile {
 // Get all available database tables
 export async function getDatabaseTables(): Promise<DatabaseTable[]> {
   try {
+    console.log('🔍 [DEBUG] Starting getDatabaseTables...')
+    
     // First, let's get actual table information from the database
     const { data: tablesData, error: tablesError } = await everythingEnglishClient
       .from('information_schema.tables')
@@ -429,11 +431,14 @@ export async function getDatabaseTables(): Promise<DatabaseTable[]> {
         'subscriptions'
       ])
 
+    console.log('🔍 [DEBUG] Tables query result:', { tablesData, tablesError })
+
     if (tablesError) {
-      console.error('Error fetching table names:', tablesError)
+      console.error('❌ [ERROR] Error fetching table names:', tablesError)
     }
 
     const availableTables = tablesData?.map(t => t.table_name) || []
+    console.log('🔍 [DEBUG] Available tables:', availableTables)
 
     const tables: DatabaseTable[] = [
       {
@@ -480,12 +485,14 @@ export async function getDatabaseTables(): Promise<DatabaseTable[]> {
       }
     ]
 
-    // Filter to only include tables that actually exist
-    return tables.filter(table => availableTables.includes(table.name))
+    // For now, return all tables regardless of whether they exist in the schema
+    // This ensures we always show something to the user
+    console.log('🔍 [DEBUG] Returning all tables:', tables)
+    return tables
   } catch (error) {
-    console.error('Error in getDatabaseTables:', error)
+    console.error('❌ [ERROR] Error in getDatabaseTables:', error)
     // Return default tables even if there's an error
-    return [
+    const fallbackTables = [
       {
         name: 'assessment_users',
         displayName: 'Assessment Users',
@@ -501,6 +508,8 @@ export async function getDatabaseTables(): Promise<DatabaseTable[]> {
         color: 'green'
       }
     ]
+    console.log('🔍 [DEBUG] Returning fallback tables:', fallbackTables)
+    return fallbackTables
   }
 }
 
