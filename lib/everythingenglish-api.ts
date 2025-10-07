@@ -367,3 +367,446 @@ export function getGrowthIcon(growthRate: number): 'trending-up' | 'trending-dow
   if (growthRate < 0) return 'trending-down'
   return 'minus'
 }
+
+// Advanced Database Browser API Functions
+export interface DatabaseTable {
+  name: string
+  displayName: string
+  description: string
+  icon: string
+  color: string
+  rowCount?: number
+  lastUpdated?: string
+}
+
+export interface TableData {
+  data: any[]
+  count: number
+  schema: any[]
+  error?: string
+}
+
+export interface UserSearchResult {
+  id: string
+  type: 'user' | 'evaluation' | 'goal' | 'streak' | 'resource' | 'subscription'
+  data: any
+  relevanceScore?: number
+}
+
+export interface UserProfile {
+  user: any
+  evaluations: any[]
+  goals: any[]
+  streaks: any[]
+  resources: any[]
+  subscriptions: any[]
+  statistics: {
+    totalEvaluations: number
+    totalGoals: number
+    currentStreak: number
+    longestStreak: number
+    totalResources: number
+    subscriptionStatus: string
+    lastActivity: string
+    engagementScore: number
+  }
+}
+
+// Get all available database tables
+export async function getDatabaseTables(): Promise<DatabaseTable[]> {
+  try {
+    // First, let's get actual table information from the database
+    const { data: tablesData, error: tablesError } = await everythingEnglishClient
+      .from('information_schema.tables')
+      .select('table_name')
+      .eq('table_schema', 'public')
+      .in('table_name', [
+        'assessment_users',
+        'assessment_evaluations', 
+        'study_goals',
+        'study_streaks',
+        'saved_resources',
+        'subscriptions'
+      ])
+
+    if (tablesError) {
+      console.error('Error fetching table names:', tablesError)
+    }
+
+    const availableTables = tablesData?.map(t => t.table_name) || []
+
+    const tables: DatabaseTable[] = [
+      {
+        name: 'assessment_users',
+        displayName: 'Assessment Users',
+        description: 'User accounts and profiles with authentication data',
+        icon: 'Users',
+        color: 'blue'
+      },
+      {
+        name: 'assessment_evaluations',
+        displayName: 'Evaluations',
+        description: 'Student evaluations, scores, and feedback data',
+        icon: 'FileText',
+        color: 'green'
+      },
+      {
+        name: 'study_goals',
+        displayName: 'Study Goals',
+        description: 'User learning goals, progress tracking, and objectives',
+        icon: 'Target',
+        color: 'purple'
+      },
+      {
+        name: 'study_streaks',
+        displayName: 'Study Streaks',
+        description: 'User study streak data and activity patterns',
+        icon: 'Zap',
+        color: 'orange'
+      },
+      {
+        name: 'saved_resources',
+        displayName: 'Saved Resources',
+        description: 'User bookmarked learning resources and materials',
+        icon: 'BookOpen',
+        color: 'indigo'
+      },
+      {
+        name: 'subscriptions',
+        displayName: 'Subscriptions',
+        description: 'Subscription plans, billing, and payment information',
+        icon: 'CreditCard',
+        color: 'emerald'
+      }
+    ]
+
+    // Filter to only include tables that actually exist
+    return tables.filter(table => availableTables.includes(table.name))
+  } catch (error) {
+    console.error('Error in getDatabaseTables:', error)
+    // Return default tables even if there's an error
+    return [
+      {
+        name: 'assessment_users',
+        displayName: 'Assessment Users',
+        description: 'User accounts and profiles',
+        icon: 'Users',
+        color: 'blue'
+      },
+      {
+        name: 'assessment_evaluations',
+        displayName: 'Evaluations',
+        description: 'Student evaluations and feedback',
+        icon: 'FileText',
+        color: 'green'
+      }
+    ]
+  }
+}
+
+// Get table data with advanced filtering and pagination
+export async function getTableData(
+  tableName: string, 
+  limit: number = 100, 
+  offset: number = 0,
+  orderBy: string = 'created_at',
+  ascending: boolean = false
+): Promise<TableData> {
+  try {
+    console.log(`Fetching data from table: ${tableName}`)
+    
+    // Get the actual data
+    const { data, error, count } = await everythingEnglishClient
+      .from(tableName)
+      .select('*', { count: 'exact' })
+      .range(offset, offset + limit - 1)
+      .order(orderBy, { ascending })
+
+    if (error) {
+      console.error(`Supabase query error for table ${tableName}:`, error)
+      return {
+        data: [],
+        count: 0,
+        schema: [],
+        error: error.message
+      }
+    }
+
+    // Get table schema information
+    const { data: schemaData, error: schemaError } = await everythingEnglishClient
+      .from('information_schema.columns')
+      .select('column_name, data_type, is_nullable, column_default')
+      .eq('table_name', tableName)
+      .eq('table_schema', 'public')
+
+    if (schemaError) {
+      console.error(`Schema query error for table ${tableName}:`, schemaError)
+    }
+
+    console.log(`Successfully fetched ${data?.length || 0} rows from ${tableName}`)
+
+    return {
+      data: data || [],
+      count: count || 0,
+      schema: schemaData || [],
+      error: undefined
+    }
+  } catch (error) {
+    console.error(`Error in getTableData for ${tableName}:`, error)
+    return {
+      data: [],
+      count: 0,
+      schema: [],
+      error: error instanceof Error ? error.message : 'Unknown error occurred'
+    }
+  }
+}
+
+// Advanced user search across multiple tables
+export async function searchUsersAdvanced(searchTerm: string): Promise<UserSearchResult[]> {
+  if (!searchTerm.trim()) {
+    return []
+  }
+
+  try {
+    console.log(`Searching for users with term: ${searchTerm}`)
+    
+    const results: UserSearchResult[] = []
+    const searchPattern = `%${searchTerm}%`
+
+    // Search in assessment_users table
+    try {
+      const { data: usersData, error: usersError } = await everythingEnglishClient
+        .from('assessment_users')
+        .select('*')
+        .or(`id.ilike.${searchPattern},email.ilike.${searchPattern},full_name.ilike.${searchPattern},display_name.ilike.${searchPattern}`)
+        .limit(10)
+
+      if (!usersError && usersData) {
+        usersData.forEach(user => {
+          results.push({
+            id: user.id,
+            type: 'user',
+            data: user,
+            relevanceScore: calculateRelevanceScore(user, searchTerm)
+          })
+        })
+      }
+    } catch (error) {
+      console.error('Error searching users:', error)
+    }
+
+    // Search in assessment_evaluations table
+    try {
+      const { data: evaluationsData, error: evaluationsError } = await everythingEnglishClient
+        .from('assessment_evaluations')
+        .select('user_id, score, created_at, question_type')
+        .ilike('user_id', searchPattern)
+        .limit(10)
+
+      if (!evaluationsError && evaluationsData) {
+        evaluationsData.forEach(evaluation => {
+          results.push({
+            id: evaluation.user_id,
+            type: 'evaluation',
+            data: evaluation,
+            relevanceScore: 0.7
+          })
+        })
+      }
+    } catch (error) {
+      console.error('Error searching evaluations:', error)
+    }
+
+    // Sort by relevance score
+    results.sort((a, b) => (b.relevanceScore || 0) - (a.relevanceScore || 0))
+
+    console.log(`Found ${results.length} search results`)
+    return results.slice(0, 20) // Limit to 20 results
+  } catch (error) {
+    console.error('Error in searchUsersAdvanced:', error)
+    return []
+  }
+}
+
+// Calculate relevance score for search results
+function calculateRelevanceScore(user: any, searchTerm: string): number {
+  let score = 0
+  const term = searchTerm.toLowerCase()
+  
+  if (user.email?.toLowerCase().includes(term)) score += 1.0
+  if (user.full_name?.toLowerCase().includes(term)) score += 0.9
+  if (user.display_name?.toLowerCase().includes(term)) score += 0.8
+  if (user.id?.toLowerCase().includes(term)) score += 0.7
+  
+  return score
+}
+
+// Get comprehensive user profile data
+export async function getUserProfile(userId: string): Promise<UserProfile | null> {
+  try {
+    console.log(`Fetching comprehensive profile for user: ${userId}`)
+    
+    // Fetch user data
+    const { data: userData, error: userError } = await everythingEnglishClient
+      .from('assessment_users')
+      .select('*')
+      .eq('id', userId)
+      .single()
+
+    if (userError || !userData) {
+      console.error(`User not found: ${userId}`, userError)
+      return null
+    }
+
+    // Fetch related data in parallel
+    const [
+      evaluationsResult,
+      goalsResult,
+      streaksResult,
+      resourcesResult,
+      subscriptionsResult
+    ] = await Promise.allSettled([
+      everythingEnglishClient
+        .from('assessment_evaluations')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false }),
+      
+      everythingEnglishClient
+        .from('study_goals')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false }),
+      
+      everythingEnglishClient
+        .from('study_streaks')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false }),
+      
+      everythingEnglishClient
+        .from('saved_resources')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false }),
+      
+      everythingEnglishClient
+        .from('subscriptions')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+    ])
+
+    const evaluations = evaluationsResult.status === 'fulfilled' ? evaluationsResult.value.data || [] : []
+    const goals = goalsResult.status === 'fulfilled' ? goalsResult.value.data || [] : []
+    const streaks = streaksResult.status === 'fulfilled' ? streaksResult.value.data || [] : []
+    const resources = resourcesResult.status === 'fulfilled' ? resourcesResult.value.data || [] : []
+    const subscriptions = subscriptionsResult.status === 'fulfilled' ? subscriptionsResult.value.data || [] : []
+
+    // Calculate statistics
+    const currentStreak = streaks.length > 0 ? Math.max(...streaks.map(s => s.current_streak || 0)) : 0
+    const longestStreak = streaks.length > 0 ? Math.max(...streaks.map(s => s.longest_streak || 0)) : 0
+    const lastActivity = evaluations.length > 0 ? evaluations[0].created_at : userData.created_at
+    const engagementScore = calculateEngagementScore(evaluations, goals, streaks, resources)
+
+    const profile: UserProfile = {
+      user: userData,
+      evaluations,
+      goals,
+      streaks,
+      resources,
+      subscriptions,
+      statistics: {
+        totalEvaluations: evaluations.length,
+        totalGoals: goals.length,
+        currentStreak,
+        longestStreak,
+        totalResources: resources.length,
+        subscriptionStatus: subscriptions.length > 0 ? subscriptions[0].status : 'free',
+        lastActivity,
+        engagementScore
+      }
+    }
+
+    console.log(`Successfully fetched profile for user ${userId}`)
+    return profile
+  } catch (error) {
+    console.error(`Error fetching user profile for ${userId}:`, error)
+    return null
+  }
+}
+
+// Calculate user engagement score
+function calculateEngagementScore(evaluations: any[], goals: any[], streaks: any[], resources: any[]): number {
+  let score = 0
+  
+  // Base score from evaluations
+  score += Math.min(evaluations.length * 2, 50)
+  
+  // Goals completion
+  const completedGoals = goals.filter(g => g.status === 'completed').length
+  score += completedGoals * 5
+  
+  // Streak bonus
+  const maxStreak = streaks.length > 0 ? Math.max(...streaks.map(s => s.current_streak || 0)) : 0
+  score += Math.min(maxStreak * 0.5, 25)
+  
+  // Resources saved
+  score += Math.min(resources.length * 1, 15)
+  
+  return Math.min(score, 100) // Cap at 100
+}
+
+// Test database connection
+export async function testDatabaseConnection(): Promise<{ connected: boolean; error?: string }> {
+  try {
+    const { data, error } = await everythingEnglishClient
+      .from('assessment_users')
+      .select('count')
+      .limit(1)
+    
+    if (error) {
+      return { connected: false, error: error.message }
+    }
+    
+    return { connected: true }
+  } catch (error) {
+    return { 
+      connected: false, 
+      error: error instanceof Error ? error.message : 'Unknown connection error' 
+    }
+  }
+}
+
+// Get table statistics
+export async function getTableStatistics(tableName: string): Promise<{
+  rowCount: number
+  lastUpdated: string
+  columnCount: number
+}> {
+  try {
+    const { count, error } = await everythingEnglishClient
+      .from(tableName)
+      .select('*', { count: 'exact', head: true })
+
+    const { data: schemaData } = await everythingEnglishClient
+      .from('information_schema.columns')
+      .select('column_name')
+      .eq('table_name', tableName)
+      .eq('table_schema', 'public')
+
+    return {
+      rowCount: count || 0,
+      lastUpdated: new Date().toISOString(),
+      columnCount: schemaData?.length || 0
+    }
+  } catch (error) {
+    console.error(`Error getting table statistics for ${tableName}:`, error)
+    return {
+      rowCount: 0,
+      lastUpdated: new Date().toISOString(),
+      columnCount: 0
+    }
+  }
+}

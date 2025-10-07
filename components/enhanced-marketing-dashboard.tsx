@@ -9,7 +9,17 @@ import {
   getGrowthColor, 
   getGrowthIcon,
   type MarketingMetrics,
-  everythingEnglishClient
+  everythingEnglishClient,
+  getDatabaseTables,
+  getTableData,
+  searchUsersAdvanced,
+  getUserProfile,
+  testDatabaseConnection,
+  getTableStatistics,
+  type DatabaseTable,
+  type TableData,
+  type UserSearchResult,
+  type UserProfile
 } from "@/lib/everythingenglish-api"
 import { RealAnalyticsDashboard } from "@/components/real-analytics-dashboard"
 import { realGoogleAnalyticsAPI, type StandardMetrics, type GeographicMetrics } from "@/lib/real-google-analytics-api"
@@ -109,15 +119,15 @@ export function EnhancedMarketingDashboard() {
   const [performanceMetrics, setPerformanceMetrics] = useState<any>(null)
 
   // Enhanced Database browser state
-  const [databaseTables, setDatabaseTables] = useState<any[]>([])
+  const [databaseTables, setDatabaseTables] = useState<DatabaseTable[]>([])
   const [selectedTable, setSelectedTable] = useState<string>('')
-  const [tableData, setTableData] = useState<any[]>([])
-  const [selectedUser, setSelectedUser] = useState<any>(null)
-  const [userEvaluations, setUserEvaluations] = useState<any[]>([])
+  const [tableData, setTableData] = useState<TableData>({ data: [], count: 0, schema: [] })
+  const [selectedUserProfile, setSelectedUserProfile] = useState<UserProfile | null>(null)
   const [databaseLoading, setDatabaseLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(20)
+  const [connectionStatus, setConnectionStatus] = useState<{ connected: boolean; error?: string }>({ connected: false })
   
   // Advanced sorting and filtering
   const [sortConfig, setSortConfig] = useState<{key: string, direction: 'asc' | 'desc'} | null>(null)
@@ -133,21 +143,8 @@ export function EnhancedMarketingDashboard() {
   
   // User search and details
   const [userSearchTerm, setUserSearchTerm] = useState('')
-  const [userSearchResults, setUserSearchResults] = useState<any[]>([])
-  const [selectedUserDetails, setSelectedUserDetails] = useState<any>(null)
-  const [userRelatedData, setUserRelatedData] = useState<{
-    evaluations: any[]
-    goals: any[]
-    streaks: any[]
-    resources: any[]
-    subscriptions: any[]
-  }>({
-    evaluations: [],
-    goals: [],
-    streaks: [],
-    resources: [],
-    subscriptions: []
-  })
+  const [userSearchResults, setUserSearchResults] = useState<UserSearchResult[]>([])
+  const [userSearchLoading, setUserSearchLoading] = useState(false)
   
   // Quick filters and saved searches
   const [quickFilters, setQuickFilters] = useState<Record<string, any>>({})
@@ -190,6 +187,7 @@ export function EnhancedMarketingDashboard() {
     fetchAnalyticsData()
     fetchComprehensiveMetrics()
     fetchDatabaseTables()
+    testConnection()
   }, [])
 
   const fetchComprehensiveMetrics = async () => {
@@ -229,52 +227,29 @@ export function EnhancedMarketingDashboard() {
   const fetchDatabaseTables = async () => {
     try {
       setDatabaseLoading(true)
-      // Direct Supabase query to get table information
-      const tables = [
-        { 
-          name: 'assessment_users', 
-          displayName: 'Assessment Users', 
-          description: 'User accounts and profiles',
-          icon: 'Users',
-          color: 'blue'
-        },
-        { 
-          name: 'assessment_evaluations', 
-          displayName: 'Evaluations', 
-          description: 'Student evaluations and feedback',
-          icon: 'FileText',
-          color: 'green'
-        },
-        { 
-          name: 'study_goals', 
-          displayName: 'Study Goals', 
-          description: 'User learning goals and progress',
-          icon: 'Target',
-          color: 'purple'
-        },
-        { 
-          name: 'study_streaks', 
-          displayName: 'Study Streaks', 
-          description: 'User study streak data',
-          icon: 'Zap',
-          color: 'orange'
-        },
-        { 
-          name: 'saved_resources', 
-          displayName: 'Saved Resources', 
-          description: 'User saved learning resources',
-          icon: 'BookOpen',
-          color: 'indigo'
-        },
-        { 
-          name: 'subscriptions', 
-          displayName: 'Subscriptions', 
-          description: 'Subscription plans and billing',
-          icon: 'CreditCard',
-          color: 'emerald'
-        }
-      ]
-      setDatabaseTables(tables)
+      console.log('Fetching database tables...')
+      
+      const tables = await getDatabaseTables()
+      console.log('Fetched tables:', tables)
+      
+      // Get statistics for each table
+      const tablesWithStats = await Promise.all(
+        tables.map(async (table) => {
+          try {
+            const stats = await getTableStatistics(table.name)
+            return {
+              ...table,
+              rowCount: stats.rowCount,
+              lastUpdated: stats.lastUpdated
+            }
+          } catch (error) {
+            console.error(`Error getting stats for ${table.name}:`, error)
+            return table
+          }
+        })
+      )
+      
+      setDatabaseTables(tablesWithStats)
     } catch (err) {
       console.error('Failed to fetch database tables:', err)
     } finally {
@@ -285,37 +260,26 @@ export function EnhancedMarketingDashboard() {
   const fetchTableData = async (tableName: string, limit: number = 100, offset: number = 0) => {
     try {
       setDatabaseLoading(true)
-      
-      // Direct Supabase query with enhanced features
-      const { data, error, count } = await everythingEnglishClient
-        .from(tableName)
-        .select('*', { count: 'exact' })
-        .range(offset, offset + limit - 1)
-        .order('created_at', { ascending: false })
+      console.log(`Fetching data from table: ${tableName}`)
 
-      if (error) {
-        console.error('Supabase query error:', error)
-        throw error
+      const result = await getTableData(tableName, limit, offset)
+      
+      if (result.error) {
+        console.error('Error fetching table data:', result.error)
+        setTableData({ data: [], count: 0, schema: [], error: result.error })
+      } else {
+        console.log(`Successfully fetched ${result.data.length} rows from ${tableName}`)
+        setTableData(result)
+        setTableSchema(result.schema)
+        
+        // Set default selected columns to all columns
+        if (result.data.length > 0) {
+          setSelectedColumns(Object.keys(result.data[0]))
+        }
       }
-
-      setTableData(data || [])
-      
-      // Get table schema information
-      const { data: schemaData } = await everythingEnglishClient
-        .from('information_schema.columns')
-        .select('column_name, data_type, is_nullable')
-        .eq('table_name', tableName)
-
-      setTableSchema(schemaData || [])
-      
-      // Set default selected columns to all columns
-      if (data && data.length > 0) {
-        setSelectedColumns(Object.keys(data[0]))
-      }
-      
     } catch (err) {
       console.error('Failed to fetch table data:', err)
-      setTableData([])
+      setTableData({ data: [], count: 0, schema: [], error: err instanceof Error ? err.message : 'Unknown error' })
     } finally {
       setDatabaseLoading(false)
     }
@@ -386,33 +350,18 @@ export function EnhancedMarketingDashboard() {
     }
 
     try {
-      setDatabaseLoading(true)
+      setUserSearchLoading(true)
+      console.log(`Searching for users with term: ${searchTerm}`)
       
-      // Search across multiple user-related tables
-      const [usersResult, evaluationsResult] = await Promise.all([
-        everythingEnglishClient
-          .from('assessment_users')
-          .select('*')
-          .or(`id.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%,full_name.ilike.%${searchTerm}%`)
-          .limit(20),
-        
-        everythingEnglishClient
-          .from('assessment_evaluations')
-          .select('user_id, score, created_at')
-          .ilike('user_id', `%${searchTerm}%`)
-          .limit(20)
-      ])
-
-      const combinedResults = [
-        ...(usersResult.data || []).map(user => ({ ...user, type: 'user' })),
-        ...(evaluationsResult.data || []).map(evaluation => ({ ...evaluation, type: 'evaluation' }))
-      ]
-
-      setUserSearchResults(combinedResults)
+      const results = await searchUsersAdvanced(searchTerm)
+      console.log(`Found ${results.length} search results`)
+      
+      setUserSearchResults(results)
     } catch (error) {
       console.error('User search error:', error)
+      setUserSearchResults([])
     } finally {
-      setDatabaseLoading(false)
+      setUserSearchLoading(false)
     }
   }
 
@@ -420,26 +369,20 @@ export function EnhancedMarketingDashboard() {
   const fetchUserDetails = async (userId: string) => {
     try {
       setDatabaseLoading(true)
+      console.log(`Fetching comprehensive profile for user: ${userId}`)
       
-      const [userResult, evaluationsResult, goalsResult, streaksResult, resourcesResult, subscriptionsResult] = await Promise.all([
-        everythingEnglishClient.from('assessment_users').select('*').eq('id', userId).single(),
-        everythingEnglishClient.from('assessment_evaluations').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
-        everythingEnglishClient.from('study_goals').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
-        everythingEnglishClient.from('study_streaks').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
-        everythingEnglishClient.from('saved_resources').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
-        everythingEnglishClient.from('subscriptions').select('*').eq('user_id', userId).order('created_at', { ascending: false })
-      ])
-
-      setSelectedUserDetails(userResult.data)
-      setUserRelatedData({
-        evaluations: evaluationsResult.data || [],
-        goals: goalsResult.data || [],
-        streaks: streaksResult.data || [],
-        resources: resourcesResult.data || [],
-        subscriptions: subscriptionsResult.data || []
-      })
+      const profile = await getUserProfile(userId)
+      
+      if (profile) {
+        console.log(`Successfully fetched profile for user ${userId}`)
+        setSelectedUserProfile(profile)
+      } else {
+        console.error(`User profile not found for ${userId}`)
+        setSelectedUserProfile(null)
+      }
     } catch (error) {
       console.error('Error fetching user details:', error)
+      setSelectedUserProfile(null)
     } finally {
       setDatabaseLoading(false)
     }
@@ -545,9 +488,21 @@ export function EnhancedMarketingDashboard() {
     setActiveQuickFilter(null)
   }
 
+  // Test database connection
+  const testConnection = async () => {
+    try {
+      const status = await testDatabaseConnection()
+      setConnectionStatus(status)
+      console.log('Database connection status:', status)
+    } catch (error) {
+      console.error('Error testing database connection:', error)
+      setConnectionStatus({ connected: false, error: 'Connection test failed' })
+    }
+  }
+
   // Process and filter data with advanced filtering
   const processedTableData = useMemo(() => {
-    let filtered = [...tableData]
+    let filtered = [...tableData.data]
 
     // Apply global search term
     if (searchTerm) {
@@ -1460,10 +1415,22 @@ export function EnhancedMarketingDashboard() {
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-xl font-semibold text-slate-800">EverythingEnglish Database Explorer</h3>
                 <div className="flex items-center space-x-2">
-                  <div className="flex items-center space-x-1 px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <span>Live Connection</span>
+                  <div className={`flex items-center space-x-1 px-2 py-1 rounded-full text-xs ${
+                    connectionStatus.connected 
+                      ? 'bg-green-100 text-green-800' 
+                      : 'bg-red-100 text-red-800'
+                  }`}>
+                    <div className={`w-2 h-2 rounded-full ${
+                      connectionStatus.connected ? 'bg-green-500' : 'bg-red-500'
+                    }`}></div>
+                    <span>{connectionStatus.connected ? 'Live Connection' : 'Connection Error'}</span>
                   </div>
+                  <button
+                    onClick={testConnection}
+                    className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs hover:bg-blue-200"
+                  >
+                    Test
+                  </button>
                 </div>
               </div>
               
@@ -1492,6 +1459,9 @@ export function EnhancedMarketingDashboard() {
                         <div>
                           <h4 className="font-semibold text-slate-800">{table.displayName}</h4>
                           <p className="text-xs text-slate-500 font-mono">{table.name}</p>
+                          {table.rowCount !== undefined && (
+                            <p className="text-xs text-slate-400">{table.rowCount.toLocaleString()} rows</p>
+                          )}
                         </div>
                       </div>
                       <div className={`w-3 h-3 rounded-full ${selectedTable === table.name ? 'bg-blue-500' : 'bg-slate-300'}`}></div>
@@ -1511,7 +1481,7 @@ export function EnhancedMarketingDashboard() {
                       {databaseTables.find(t => t.name === selectedTable)?.displayName} Data
                     </h3>
                     <span className="px-2 py-1 bg-slate-100 text-slate-600 rounded-full text-xs">
-                      {processedTableData.length} records
+                      {processedTableData.length} of {tableData.count} records
                     </span>
                   </div>
                   <div className="flex items-center space-x-3">
@@ -1575,6 +1545,9 @@ export function EnhancedMarketingDashboard() {
                           }}
                           className="w-full pl-10 pr-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
+                        {userSearchLoading && (
+                          <RefreshCw className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400 animate-spin" />
+                        )}
                       </div>
                     </div>
                     <div>
@@ -1779,14 +1752,32 @@ export function EnhancedMarketingDashboard() {
                       <span className="ml-2 text-slate-600">Loading data...</span>
                     </div>
                   </GlassCard>
+                ) : tableData.error ? (
+                  <GlassCard className="p-6">
+                    <div className="flex items-center justify-center py-8">
+                      <div className="text-center">
+                        <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                          <XCircle className="w-6 h-6 text-red-600" />
+                        </div>
+                        <h3 className="text-lg font-semibold text-slate-800 mb-2">Error Loading Data</h3>
+                        <p className="text-slate-600 mb-4">{tableData.error}</p>
+                        <button
+                          onClick={() => fetchTableData(selectedTable)}
+                          className="px-4 py-2 bg-blue-100 text-blue-800 rounded-lg hover:bg-blue-200"
+                        >
+                          Retry
+                        </button>
+                      </div>
+                    </div>
+                  </GlassCard>
                 ) : (
                   <GlassCard className="p-4">
                     {/* Column Selection */}
-                    {showColumnFilters && tableData.length > 0 && (
+                    {showColumnFilters && tableData.data.length > 0 && (
                       <div className="mb-4 p-4 bg-slate-50 rounded-lg">
                         <h4 className="font-medium text-slate-700 mb-3">Select Columns to Display</h4>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                          {Object.keys(tableData[0]).map((column) => (
+                          {Object.keys(tableData.data[0]).map((column) => (
                             <label key={column} className="flex items-center space-x-2">
                               <input
                                 type="checkbox"
@@ -1812,7 +1803,7 @@ export function EnhancedMarketingDashboard() {
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="border-b border-slate-200">
-                            {(selectedColumns.length > 0 ? selectedColumns : (tableData.length > 0 ? Object.keys(tableData[0]) : [])).map((key) => (
+                            {(selectedColumns.length > 0 ? selectedColumns : (tableData.data.length > 0 ? Object.keys(tableData.data[0]) : [])).map((key) => (
                               <th 
                                 key={key} 
                                 className="text-left py-3 px-3 font-semibold text-slate-700 cursor-pointer hover:bg-slate-50 select-none group"
@@ -1950,7 +1941,7 @@ export function EnhancedMarketingDashboard() {
             )}
 
             {/* Comprehensive User Details Modal */}
-            {selectedUserDetails && (
+            {selectedUserProfile && (
               <div className="mb-6">
                 <GlassCard className="p-6">
                   <div className="flex items-center justify-between mb-6">
@@ -1960,21 +1951,14 @@ export function EnhancedMarketingDashboard() {
                       </div>
                       <div>
                         <h3 className="text-xl font-semibold text-slate-800">
-                          {selectedUserDetails.full_name || selectedUserDetails.email}
+                          {selectedUserProfile.user.full_name || selectedUserProfile.user.email}
                         </h3>
-                        <p className="text-slate-600">{selectedUserDetails.email}</p>
+                        <p className="text-slate-600">{selectedUserProfile.user.email}</p>
                       </div>
                     </div>
                     <button
                       onClick={() => {
-                        setSelectedUserDetails(null)
-                        setUserRelatedData({
-                          evaluations: [],
-                          goals: [],
-                          streaks: [],
-                          resources: [],
-                          subscriptions: []
-                        })
+                        setSelectedUserProfile(null)
                       }}
                       className="text-slate-500 hover:text-slate-700 p-2 hover:bg-slate-100 rounded-lg"
                     >
@@ -1990,7 +1974,7 @@ export function EnhancedMarketingDashboard() {
                           <FileText className="w-5 h-5 text-green-600" />
                         </div>
                         <div>
-                          <p className="text-2xl font-bold text-slate-800">{userRelatedData.evaluations.length}</p>
+                          <p className="text-2xl font-bold text-slate-800">{selectedUserProfile.statistics.totalEvaluations}</p>
                           <p className="text-sm text-slate-600">Evaluations</p>
                         </div>
                       </div>
@@ -2002,7 +1986,7 @@ export function EnhancedMarketingDashboard() {
                           <Target className="w-5 h-5 text-purple-600" />
                         </div>
                         <div>
-                          <p className="text-2xl font-bold text-slate-800">{userRelatedData.goals.length}</p>
+                          <p className="text-2xl font-bold text-slate-800">{selectedUserProfile.statistics.totalGoals}</p>
                           <p className="text-sm text-slate-600">Study Goals</p>
                         </div>
                       </div>
@@ -2015,7 +1999,7 @@ export function EnhancedMarketingDashboard() {
                         </div>
                         <div>
                           <p className="text-2xl font-bold text-slate-800">
-                            {userRelatedData.streaks.length > 0 ? userRelatedData.streaks[0].current_streak : 0}
+                            {selectedUserProfile.statistics.currentStreak}
                           </p>
                           <p className="text-sm text-slate-600">Current Streak</p>
                         </div>
@@ -2029,7 +2013,7 @@ export function EnhancedMarketingDashboard() {
                         </div>
                         <div>
                           <p className="text-2xl font-bold text-slate-800">
-                            {userRelatedData.subscriptions.length > 0 ? userRelatedData.subscriptions[0].status : 'Free'}
+                            {selectedUserProfile.statistics.subscriptionStatus}
                           </p>
                           <p className="text-sm text-slate-600">Subscription</p>
                         </div>
@@ -2039,10 +2023,10 @@ export function EnhancedMarketingDashboard() {
 
                   {/* User Evaluations */}
                   <div>
-                    <h4 className="font-semibold text-slate-700 mb-3">Recent Evaluations ({userEvaluations.length})</h4>
-                    {userEvaluations.length > 0 ? (
+                    <h4 className="font-semibold text-slate-700 mb-3">Recent Evaluations ({selectedUserProfile.evaluations.length})</h4>
+                    {selectedUserProfile.evaluations.length > 0 ? (
                       <div className="space-y-3">
-                        {userEvaluations.slice(0, 5).map((evaluation, index) => (
+                        {selectedUserProfile.evaluations.slice(0, 5).map((evaluation, index) => (
                           <div key={index} className="glass-panel p-4 rounded-lg">
                             <div className="flex items-center justify-between mb-2">
                               <span className="font-medium text-slate-800">
@@ -2077,9 +2061,9 @@ export function EnhancedMarketingDashboard() {
                             )}
                           </div>
                         ))}
-                        {userEvaluations.length > 5 && (
+                        {selectedUserProfile.evaluations.length > 5 && (
                           <div className="text-center text-sm text-slate-500">
-                            ... and {userEvaluations.length - 5} more evaluations
+                            ... and {selectedUserProfile.evaluations.length - 5} more evaluations
                           </div>
                         )}
                       </div>
@@ -2098,64 +2082,64 @@ export function EnhancedMarketingDashboard() {
                       <div className="space-y-3">
                         <div className="flex justify-between">
                           <span className="text-sm font-medium text-slate-600">User ID:</span>
-                          <span className="text-sm text-slate-800 font-mono">{selectedUserDetails.id}</span>
+                          <span className="text-sm text-slate-800 font-mono">{selectedUserProfile.user.id}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-sm font-medium text-slate-600">Email:</span>
-                          <span className="text-sm text-slate-800">{selectedUserDetails.email}</span>
+                          <span className="text-sm text-slate-800">{selectedUserProfile.user.email}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-sm font-medium text-slate-600">Full Name:</span>
-                          <span className="text-sm text-slate-800">{selectedUserDetails.full_name || 'N/A'}</span>
+                          <span className="text-sm text-slate-800">{selectedUserProfile.user.full_name || 'N/A'}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-sm font-medium text-slate-600">Academic Level:</span>
-                          <span className="text-sm text-slate-800">{selectedUserDetails.academic_level || 'N/A'}</span>
+                          <span className="text-sm text-slate-800">{selectedUserProfile.user.academic_level || 'N/A'}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-sm font-medium text-slate-600">Created:</span>
                           <span className="text-sm text-slate-800">
-                            {selectedUserDetails.created_at ? new Date(selectedUserDetails.created_at).toLocaleDateString() : 'N/A'}
+                            {selectedUserProfile.user.created_at ? new Date(selectedUserProfile.user.created_at).toLocaleDateString() : 'N/A'}
                           </span>
                         </div>
                       </div>
                       <div className="space-y-3">
                         <div className="flex justify-between">
                           <span className="text-sm font-medium text-slate-600">Questions Marked:</span>
-                          <span className="text-sm text-slate-800">{selectedUserDetails.questions_marked || 0}</span>
+                          <span className="text-sm text-slate-800">{selectedUserProfile.user.questions_marked || 0}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-sm font-medium text-slate-600">Credits:</span>
-                          <span className="text-sm text-slate-800">{selectedUserDetails.credits || 0}</span>
+                          <span className="text-sm text-slate-800">{selectedUserProfile.user.credits || 0}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-sm font-medium text-slate-600">Current Plan:</span>
-                          <span className="text-sm text-slate-800">{selectedUserDetails.current_plan || 'free'}</span>
+                          <span className="text-sm text-slate-800">{selectedUserProfile.user.current_plan || 'free'}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-sm font-medium text-slate-600">Subscription Status:</span>
                           <span className={`text-sm px-2 py-1 rounded-full ${
-                            selectedUserDetails.subscription_status === 'active' ? 'bg-green-100 text-green-800' :
-                            selectedUserDetails.subscription_status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                            selectedUserProfile.user.subscription_status === 'active' ? 'bg-green-100 text-green-800' :
+                            selectedUserProfile.user.subscription_status === 'cancelled' ? 'bg-red-100 text-red-800' :
                             'bg-slate-100 text-slate-800'
                           }`}>
-                            {selectedUserDetails.subscription_status || 'free'}
+                            {selectedUserProfile.user.subscription_status || 'free'}
                           </span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-sm font-medium text-slate-600">Launch User:</span>
-                          <span className="text-sm text-slate-800">{selectedUserDetails.is_launch_user ? 'Yes' : 'No'}</span>
+                          <span className="text-sm text-slate-800">{selectedUserProfile.user.is_launch_user ? 'Yes' : 'No'}</span>
                         </div>
                       </div>
                     </div>
                   </div>
 
                   {/* Study Goals */}
-                  {userRelatedData.goals.length > 0 && (
+                  {selectedUserProfile.goals.length > 0 && (
                     <div className="mt-6">
-                      <h4 className="font-semibold text-slate-700 mb-3">Study Goals ({userRelatedData.goals.length})</h4>
+                      <h4 className="font-semibold text-slate-700 mb-3">Study Goals ({selectedUserProfile.goals.length})</h4>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {userRelatedData.goals.slice(0, 4).map((goal, index) => (
+                        {selectedUserProfile.goals.slice(0, 4).map((goal, index) => (
                           <GlassCard key={index} className="p-4">
                             <div className="flex items-center justify-between mb-2">
                               <h5 className="font-medium text-slate-800">{goal.title || 'Untitled Goal'}</h5>
@@ -2181,11 +2165,11 @@ export function EnhancedMarketingDashboard() {
                   )}
 
                   {/* Study Streaks */}
-                  {userRelatedData.streaks.length > 0 && (
+                  {selectedUserProfile.streaks.length > 0 && (
                     <div className="mt-6">
                       <h4 className="font-semibold text-slate-700 mb-3">Study Streaks</h4>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {userRelatedData.streaks.slice(0, 3).map((streak, index) => (
+                        {selectedUserProfile.streaks.slice(0, 3).map((streak, index) => (
                           <GlassCard key={index} className="p-4">
                             <div className="flex items-center space-x-3">
                               <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
@@ -2207,11 +2191,11 @@ export function EnhancedMarketingDashboard() {
                   )}
 
                   {/* Saved Resources */}
-                  {userRelatedData.resources.length > 0 && (
+                  {selectedUserProfile.resources.length > 0 && (
                     <div className="mt-6">
-                      <h4 className="font-semibold text-slate-700 mb-3">Saved Resources ({userRelatedData.resources.length})</h4>
+                      <h4 className="font-semibold text-slate-700 mb-3">Saved Resources ({selectedUserProfile.resources.length})</h4>
                       <div className="space-y-2">
-                        {userRelatedData.resources.slice(0, 5).map((resource, index) => (
+                        {selectedUserProfile.resources.slice(0, 5).map((resource, index) => (
                           <div key={index} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
                             <div>
                               <p className="font-medium text-slate-800">{resource.title || 'Untitled Resource'}</p>
@@ -2227,11 +2211,11 @@ export function EnhancedMarketingDashboard() {
                   )}
 
                   {/* Subscription Details */}
-                  {userRelatedData.subscriptions.length > 0 && (
+                  {selectedUserProfile.subscriptions.length > 0 && (
                     <div className="mt-6">
                       <h4 className="font-semibold text-slate-700 mb-3">Subscription Details</h4>
                       <div className="space-y-3">
-                        {userRelatedData.subscriptions.map((subscription, index) => (
+                        {selectedUserProfile.subscriptions.map((subscription, index) => (
                           <GlassCard key={index} className="p-4">
                             <div className="flex items-center justify-between mb-3">
                               <div>
