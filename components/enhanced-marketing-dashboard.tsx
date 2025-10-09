@@ -208,11 +208,11 @@ export function EnhancedMarketingDashboard() {
         
         // Calculate evaluation metrics
         const totalEvaluations = evaluationsData?.length || 0
-        const recentEvaluations = evaluationsData?.filter(e => {
+        const recentEvaluationsData = evaluationsData?.filter(e => {
           const thirtyDaysAgo = new Date()
           thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
           return new Date(e.created_at) > thirtyDaysAgo
-        }).length || 0
+        }) || []
         
         // Calculate daily trends
         const dailyTrends = evaluationsData?.reduce((acc, evaluation) => {
@@ -225,19 +225,76 @@ export function EnhancedMarketingDashboard() {
           return acc
         }, {} as Record<string, { date: string; evaluations: number; unique_users: Set<string> }>)
         
-        const dailyTrendsArray = Object.values(dailyTrends || {}).map(trend => ({
+        const dailyTrendsArray = Object.values(dailyTrends || {}).map((trend: any) => ({
           date: trend.date,
           evaluations: trend.evaluations,
           unique_users: trend.unique_users.size
         })).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
 
+        // Calculate return users (users with multiple evaluations)
+        const userEvaluationCounts = recentEvaluationsData.reduce((acc: Record<string, number>, evaluation) => {
+          acc[evaluation.user_id] = (acc[evaluation.user_id] || 0) + 1
+          return acc
+        }, {})
+        
+        const returnUsers = Object.values(userEvaluationCounts).filter(count => count > 1).length
+        const uniqueUsers = new Set(evaluationsData?.map(e => e.user_id)).size
+        const returnRate = uniqueUsers > 0 ? (returnUsers / uniqueUsers) * 100 : 0
+
+        // Question type breakdown
+        const questionTypes = recentEvaluationsData.reduce((acc: Record<string, number>, evaluation) => {
+          const type = evaluation.question_type || 'unknown'
+          acc[type] = (acc[type] || 0) + 1
+          return acc
+        }, {})
+
+        const questionTypesArray = Object.entries(questionTypes).map(([name, count]) => ({
+          name,
+          count
+        })).sort((a, b) => b.count - a.count)
+
+        // Hourly activity pattern
+        const hourlyActivity = recentEvaluationsData.reduce((acc: Record<number, number>, evaluation) => {
+          const hour = new Date(evaluation.created_at).getHours()
+          acc[hour] = (acc[hour] || 0) + 1
+          return acc
+        }, {})
+
+        const hourlyActivityArray = Array.from({ length: 24 }, (_, hour) => ({
+          hour,
+          count: hourlyActivity[hour] || 0
+        }))
+
+        // Weekly activity pattern (day of week)
+        const weeklyActivity = recentEvaluationsData.reduce((acc: Record<number, number>, evaluation) => {
+          const day = new Date(evaluation.created_at).getDay()
+          acc[day] = (acc[day] || 0) + 1
+          return acc
+        }, {})
+
+        const weeklyActivityArray = Array.from({ length: 7 }, (_, day) => ({
+          day,
+          dayName: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][day],
+          count: weeklyActivity[day] || 0
+        }))
+
+        // Top users by evaluation count
+        const topUsers = Object.entries(userEvaluationCounts)
+          .map(([user_id, count]) => ({ user_id, count }))
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 10)
+
         setEvaluationMetrics({
           total_evaluations: totalEvaluations,
-          recent_evaluations: recentEvaluations,
-          return_users: 0, // TODO: Calculate this
-          return_rate: 0, // TODO: Calculate this
-          avg_evaluations_per_user: totalEvaluations > 0 ? totalEvaluations / (new Set(evaluationsData?.map(e => e.user_id)).size) : 0,
-          daily_trends: dailyTrendsArray
+          recent_evaluations: recentEvaluationsData.length,
+          return_users: returnUsers,
+          return_rate: Math.round(returnRate * 100) / 100,
+          avg_evaluations_per_user: totalEvaluations > 0 ? Math.round((totalEvaluations / uniqueUsers) * 100) / 100 : 0,
+          daily_trends: dailyTrendsArray,
+          question_types: questionTypesArray,
+          hourly_activity: hourlyActivityArray,
+          weekly_activity: weeklyActivityArray,
+          top_users: topUsers
         })
       }
 
@@ -252,10 +309,19 @@ export function EnhancedMarketingDashboard() {
       } else {
         console.log('🔍 [DEBUG] Fetched users:', usersData?.length || 0)
         
+        const sevenDaysAgo = new Date()
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+        
+        const thirtyDaysAgo = new Date()
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+        
+        const activeUsers = usersData?.filter(u => u.last_sign_in_at && new Date(u.last_sign_in_at) > sevenDaysAgo).length || 0
+        const newUsers = usersData?.filter(u => new Date(u.created_at) > thirtyDaysAgo).length || 0
+        
         setUserMetrics({
           total_users: usersData?.length || 0,
-          active_users: 0, // TODO: Calculate this
-          new_users: 0 // TODO: Calculate this
+          active_users: activeUsers,
+          new_users: newUsers
         })
       }
 
@@ -350,20 +416,7 @@ export function EnhancedMarketingDashboard() {
     }
   }
 
-  const fetchUserEvaluations = async (userId: string) => {
-    try {
-      setDatabaseLoading(true)
-      const response = await fetch(`/api/analytics/standard?table=assessment_evaluations&filter=user_id:${userId}&limit=50`)
-      if (response.ok) {
-        const data = await response.json()
-        setUserEvaluations(data.data || [])
-      }
-    } catch (err) {
-      console.error('Failed to fetch user evaluations:', err)
-    } finally {
-      setDatabaseLoading(false)
-    }
-  }
+
 
   const handleRefresh = () => {
     setRefreshing(true)
@@ -1150,7 +1203,7 @@ export function EnhancedMarketingDashboard() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
               {/* Daily Evaluations Chart */}
               <GlassCard className="p-6">
-                <h3 className="text-lg font-semibold text-slate-800 mb-4">Daily Evaluations (30d)</h3>
+                <h3 className="text-lg font-semibold text-slate-800 mb-4">Daily Assessments & Unique Users</h3>
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={evaluationMetrics?.daily_trends || []}>
@@ -1218,8 +1271,112 @@ export function EnhancedMarketingDashboard() {
               </GlassCard>
             </div>
 
+            {/* Activity Patterns */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+              {/* Hourly Activity */}
+              <GlassCard className="p-6">
+                <h3 className="text-lg font-semibold text-slate-800 mb-4">Activity by Hour of Day</h3>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RechartsBarChart data={evaluationMetrics?.hourly_activity || []}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                      <XAxis 
+                        dataKey="hour" 
+                        stroke="#64748b"
+                        fontSize={12}
+                        tickFormatter={(value) => `${value}:00`}
+                      />
+                      <YAxis stroke="#64748b" fontSize={12} />
+                      <Tooltip 
+                        contentStyle={{
+                          backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                          border: '1px solid rgba(255, 255, 255, 0.18)',
+                          borderRadius: '12px',
+                          backdropFilter: 'blur(8px)'
+                        }}
+                        labelFormatter={(value) => `${value}:00`}
+                      />
+                      <Bar dataKey="count" fill="#3b82f6" radius={[8, 8, 0, 0]} />
+                    </RechartsBarChart>
+                  </ResponsiveContainer>
+                </div>
+              </GlassCard>
+
+              {/* Weekly Activity */}
+              <GlassCard className="p-6">
+                <h3 className="text-lg font-semibold text-slate-800 mb-4">Activity by Day of Week</h3>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RechartsBarChart data={evaluationMetrics?.weekly_activity || []}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                      <XAxis 
+                        dataKey="dayName" 
+                        stroke="#64748b"
+                        fontSize={12}
+                      />
+                      <YAxis stroke="#64748b" fontSize={12} />
+                      <Tooltip 
+                        contentStyle={{
+                          backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                          border: '1px solid rgba(255, 255, 255, 0.18)',
+                          borderRadius: '12px',
+                          backdropFilter: 'blur(8px)'
+                        }}
+                      />
+                      <Bar dataKey="count" fill="#10b981" radius={[8, 8, 0, 0]} />
+                    </RechartsBarChart>
+                  </ResponsiveContainer>
+                </div>
+              </GlassCard>
+            </div>
+
+            {/* Top Users */}
+            <GlassCard className="p-6 mb-6">
+              <h3 className="text-lg font-semibold text-slate-800 mb-4">Most Active Users</h3>
+              <div className="space-y-3">
+                {(evaluationMetrics?.top_users || []).map((user: any, index: number) => (
+                  <div 
+                    key={user.user_id} 
+                    className="flex items-center justify-between p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+                    onClick={() => fetchUserDetails(user.user_id)}
+                  >
+                    <div className="flex items-center space-x-3">
+                      <div 
+                        className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-semibold" 
+                        style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                      >
+                        {index + 1}
+                      </div>
+                      <div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            fetchUserDetails(user.user_id)
+                          }}
+                          className="font-mono text-sm text-blue-600 hover:text-blue-800 underline"
+                        >
+                          {user.user_id.substring(0, 8)}...
+                        </button>
+                        <p className="text-xs text-slate-500">User ID</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-2xl font-bold text-slate-800">{user.count}</p>
+                      <p className="text-xs text-slate-500">evaluations</p>
+                    </div>
+                  </div>
+                ))}
+                {(!evaluationMetrics?.top_users || evaluationMetrics.top_users.length === 0) && (
+                  <div className="text-center py-8 text-slate-500">
+                    <Users className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                    <p>No user data available yet</p>
+                  </div>
+                )}
+              </div>
+            </GlassCard>
+
             {/* Academic Level Breakdown */}
-            <GlassCard className="p-6">
+            <GlassCard className="p-6 mb-6">
               <h3 className="text-lg font-semibold text-slate-800 mb-4">Academic Level Distribution</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {metrics.assessmentAnalytics.academic_level_breakdown.map((level, index) => (
@@ -1714,10 +1871,10 @@ export function EnhancedMarketingDashboard() {
                           <div className="flex items-center justify-between">
                             <div>
                               <p className="font-medium text-slate-800">
-                                {result.type === 'user' ? result.full_name || result.email : `Evaluation: ${result.user_id}`}
+                                {result.type === 'user' ? result.data.full_name || result.data.email : `Evaluation: ${result.data.user_id}`}
                               </p>
                               <p className="text-xs text-slate-500">
-                                {result.type === 'user' ? result.email : `Score: ${result.score}`}
+                                {result.type === 'user' ? result.data.email : `Score: ${result.data.score}`}
                               </p>
                             </div>
                             <span className={`px-2 py-1 rounded-full text-xs ${
@@ -1733,7 +1890,7 @@ export function EnhancedMarketingDashboard() {
                 )}
 
                 {/* Advanced Filters Panel */}
-                {showAdvancedFilters && tableData.length > 0 && (
+                {showAdvancedFilters && tableData.data.length > 0 && (
                   <GlassCard className="p-4 mb-4">
                     <h4 className="font-medium text-slate-700 mb-4">Advanced Filters</h4>
                     
@@ -1763,7 +1920,7 @@ export function EnhancedMarketingDashboard() {
                         </div>
                         
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                          {Object.keys(tableData[0] || {}).map((column) => (
+                          {Object.keys(tableData.data[0] || {}).map((column) => (
                             <div key={column}>
                               <label className="block text-xs font-medium text-slate-600 mb-1">{column}</label>
                               <div className="flex space-x-1">
@@ -1919,19 +2076,21 @@ export function EnhancedMarketingDashboard() {
                               {(selectedColumns.length > 0 ? selectedColumns : Object.keys(row)).map((key) => (
                                 <td 
                                   key={key} 
-                                  className="py-3 px-3 text-slate-600 cursor-pointer hover:bg-slate-100 transition-colors group relative"
+                                  className="py-3 px-3 text-slate-600 cursor-pointer hover:bg-blue-50 transition-colors group relative"
                                   onClick={() => handleCellClick(key, row[key])}
                                   title={`Click to filter by: ${String(row[key])}`}
                                 >
-                                  {key === 'user_id' || key === 'uid' ? (
+                                  {key === 'user_id' || key === 'uid' || key === 'id' ? (
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation()
                                         fetchUserDetails(String(row[key]))
                                       }}
-                                      className="text-blue-600 hover:text-blue-800 underline font-mono text-xs"
+                                      className="flex items-center space-x-1 text-blue-600 hover:text-blue-800 hover:underline font-mono text-xs font-semibold bg-blue-50 px-2 py-1 rounded group-hover:bg-blue-100 transition-colors"
+                                      title="Click to view full user profile"
                                     >
-                                      {String(row[key]).substring(0, 8)}...
+                                      <User className="w-3 h-3" />
+                                      <span>{String(row[key]).substring(0, 8)}...</span>
                                     </button>
                                   ) : key === 'email' ? (
                                     <a 
@@ -2011,97 +2170,136 @@ export function EnhancedMarketingDashboard() {
 
             {/* Comprehensive User Details Modal */}
             {selectedUserProfile && (
-              <div className="mb-6">
-                <GlassCard className="p-6">
+              <div className="mb-6 border-2 border-blue-200 rounded-xl shadow-xl">
+                <GlassCard className="p-6 bg-gradient-to-br from-white to-blue-50">
                   <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center space-x-4">
-                      <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                        <User className="w-6 h-6 text-blue-600" />
+                      <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-lg">
+                        <User className="w-8 h-8 text-white" />
                       </div>
                       <div>
-                        <h3 className="text-xl font-semibold text-slate-800">
+                        <h3 className="text-2xl font-bold text-slate-800">
                           {selectedUserProfile.user.full_name || selectedUserProfile.user.email}
                         </h3>
-                        <p className="text-slate-600">{selectedUserProfile.user.email}</p>
+                        <p className="text-slate-600 text-sm">{selectedUserProfile.user.email}</p>
+                        <p className="text-xs text-slate-500 font-mono mt-1">ID: {selectedUserProfile.user.id}</p>
                       </div>
                     </div>
                     <button
                       onClick={() => {
                         setSelectedUserProfile(null)
                       }}
-                      className="text-slate-500 hover:text-slate-700 p-2 hover:bg-slate-100 rounded-lg"
+                      className="text-slate-500 hover:text-white hover:bg-red-500 p-2 rounded-lg transition-colors"
                     >
-                      <X className="w-5 h-5" />
+                      <X className="w-6 h-6" />
                     </button>
                   </div>
 
                   {/* User Overview Cards */}
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                    <GlassCard className="p-4">
+                    <GlassCard className="p-4 hover:shadow-lg transition-all duration-200 border border-green-100">
                       <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                          <FileText className="w-5 h-5 text-green-600" />
+                        <div className="w-12 h-12 bg-gradient-to-br from-green-400 to-green-600 rounded-lg flex items-center justify-center shadow-md">
+                          <FileText className="w-6 h-6 text-white" />
                         </div>
                         <div>
-                          <p className="text-2xl font-bold text-slate-800">{selectedUserProfile.statistics.totalEvaluations}</p>
-                          <p className="text-sm text-slate-600">Evaluations</p>
+                          <p className="text-3xl font-bold text-slate-800">{selectedUserProfile.statistics.totalEvaluations}</p>
+                          <p className="text-sm text-slate-600 font-medium">Evaluations</p>
                         </div>
                       </div>
                     </GlassCard>
                     
-                    <GlassCard className="p-4">
+                    <GlassCard className="p-4 hover:shadow-lg transition-all duration-200 border border-purple-100">
                       <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                          <Target className="w-5 h-5 text-purple-600" />
+                        <div className="w-12 h-12 bg-gradient-to-br from-purple-400 to-purple-600 rounded-lg flex items-center justify-center shadow-md">
+                          <Target className="w-6 h-6 text-white" />
                         </div>
                         <div>
-                          <p className="text-2xl font-bold text-slate-800">{selectedUserProfile.statistics.totalGoals}</p>
+                          <p className="text-3xl font-bold text-slate-800">{selectedUserProfile.statistics.totalGoals}</p>
                           <p className="text-sm text-slate-600">Study Goals</p>
                         </div>
                       </div>
                     </GlassCard>
                     
-                    <GlassCard className="p-4">
+                    <GlassCard className="p-4 hover:shadow-lg transition-all duration-200 border border-orange-100">
                       <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
-                          <Zap className="w-5 h-5 text-orange-600" />
+                        <div className="w-12 h-12 bg-gradient-to-br from-orange-400 to-orange-600 rounded-lg flex items-center justify-center shadow-md">
+                          <Zap className="w-6 h-6 text-white" />
                         </div>
                         <div>
-                          <p className="text-2xl font-bold text-slate-800">
+                          <p className="text-3xl font-bold text-slate-800">
                             {selectedUserProfile.statistics.currentStreak}
                           </p>
-                          <p className="text-sm text-slate-600">Current Streak</p>
+                          <p className="text-sm text-slate-600 font-medium">Day Streak</p>
                         </div>
                       </div>
                     </GlassCard>
                     
-                    <GlassCard className="p-4">
+                    <GlassCard className="p-4 hover:shadow-lg transition-all duration-200 border border-emerald-100">
                       <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
-                          <CreditCard className="w-5 h-5 text-emerald-600" />
+                        <div className="w-12 h-12 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-lg flex items-center justify-center shadow-md">
+                          <CreditCard className="w-6 h-6 text-white" />
                         </div>
                         <div>
-                          <p className="text-2xl font-bold text-slate-800">
+                          <p className={`text-xl font-bold capitalize ${
+                            selectedUserProfile.statistics.subscriptionStatus === 'active' ? 'text-green-600' :
+                            selectedUserProfile.statistics.subscriptionStatus === 'cancelled' ? 'text-red-600' :
+                            'text-slate-600'
+                          }`}>
                             {selectedUserProfile.statistics.subscriptionStatus}
                           </p>
-                          <p className="text-sm text-slate-600">Subscription</p>
+                          <p className="text-sm text-slate-600 font-medium">Status</p>
                         </div>
                       </div>
                     </GlassCard>
                   </div>
 
+                  {/* Additional Stats */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm text-slate-600 font-medium">Engagement Score</p>
+                          <p className="text-2xl font-bold text-blue-600">{selectedUserProfile.statistics.engagementScore.toFixed(1)}</p>
+                        </div>
+                        <Activity className="w-8 h-8 text-blue-500" />
+                      </div>
+                    </div>
+                    <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm text-slate-600 font-medium">Total Resources</p>
+                          <p className="text-2xl font-bold text-green-600">{selectedUserProfile.statistics.totalResources}</p>
+                        </div>
+                        <BookOpen className="w-8 h-8 text-green-500" />
+                      </div>
+                    </div>
+                    <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm text-slate-600 font-medium">Longest Streak</p>
+                          <p className="text-2xl font-bold text-purple-600">{selectedUserProfile.statistics.longestStreak} days</p>
+                        </div>
+                        <Trophy className="w-8 h-8 text-purple-500" />
+                      </div>
+                    </div>
+                  </div>
+
                   {/* User Evaluations */}
                   <div>
-                    <h4 className="font-semibold text-slate-700 mb-3">Recent Evaluations ({selectedUserProfile.evaluations.length})</h4>
+                    <h4 className="text-lg font-bold text-slate-800 mb-4 flex items-center space-x-2">
+                      <FileText className="w-5 h-5 text-blue-500" />
+                      <span>Recent Evaluations ({selectedUserProfile.evaluations.length})</span>
+                    </h4>
                     {selectedUserProfile.evaluations.length > 0 ? (
                       <div className="space-y-3">
                         {selectedUserProfile.evaluations.slice(0, 5).map((evaluation, index) => (
-                          <div key={index} className="glass-panel p-4 rounded-lg">
+                          <div key={index} className="bg-white border-2 border-slate-200 hover:border-blue-300 p-4 rounded-lg shadow-sm hover:shadow-md transition-all">
                             <div className="flex items-center justify-between mb-2">
-                              <span className="font-medium text-slate-800">
-                                {evaluation.question_type || 'Unknown Type'}
+                              <span className="font-semibold text-slate-800 capitalize">
+                                {(evaluation.question_type || 'Unknown Type').replace(/_/g, ' ')}
                               </span>
-                              <span className="text-sm text-slate-500">
+                              <span className="text-sm text-slate-500 bg-slate-100 px-2 py-1 rounded">
                                 {evaluation.timestamp ? new Date(evaluation.timestamp).toLocaleDateString() : 'N/A'}
                               </span>
                             </div>
@@ -2146,48 +2344,51 @@ export function EnhancedMarketingDashboard() {
 
                   {/* User Profile Information */}
                   <div className="mt-6">
-                    <h4 className="font-semibold text-slate-700 mb-3">Profile Information</h4>
+                    <h4 className="text-lg font-bold text-slate-800 mb-4 flex items-center space-x-2">
+                      <User className="w-5 h-5 text-purple-500" />
+                      <span>Profile Information</span>
+                    </h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-3">
-                        <div className="flex justify-between">
-                          <span className="text-sm font-medium text-slate-600">User ID:</span>
-                          <span className="text-sm text-slate-800 font-mono">{selectedUserProfile.user.id}</span>
+                      <div className="space-y-3 bg-slate-50 p-4 rounded-lg border border-slate-200">
+                        <div className="flex justify-between items-center py-2 border-b border-slate-200">
+                          <span className="text-sm font-semibold text-slate-700">User ID:</span>
+                          <span className="text-sm text-slate-800 font-mono bg-slate-200 px-2 py-1 rounded">{selectedUserProfile.user.id.substring(0, 12)}...</span>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-sm font-medium text-slate-600">Email:</span>
-                          <span className="text-sm text-slate-800">{selectedUserProfile.user.email}</span>
+                        <div className="flex justify-between items-center py-2 border-b border-slate-200">
+                          <span className="text-sm font-semibold text-slate-700">Email:</span>
+                          <span className="text-sm text-blue-600 font-medium">{selectedUserProfile.user.email}</span>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-sm font-medium text-slate-600">Full Name:</span>
-                          <span className="text-sm text-slate-800">{selectedUserProfile.user.full_name || 'N/A'}</span>
+                        <div className="flex justify-between items-center py-2 border-b border-slate-200">
+                          <span className="text-sm font-semibold text-slate-700">Full Name:</span>
+                          <span className="text-sm text-slate-800 font-medium">{selectedUserProfile.user.full_name || 'N/A'}</span>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-sm font-medium text-slate-600">Academic Level:</span>
-                          <span className="text-sm text-slate-800">{selectedUserProfile.user.academic_level || 'N/A'}</span>
+                        <div className="flex justify-between items-center py-2 border-b border-slate-200">
+                          <span className="text-sm font-semibold text-slate-700">Academic Level:</span>
+                          <span className="text-sm text-slate-800 capitalize font-medium">{selectedUserProfile.user.academic_level || 'N/A'}</span>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-sm font-medium text-slate-600">Created:</span>
+                        <div className="flex justify-between items-center py-2">
+                          <span className="text-sm font-semibold text-slate-700">Created:</span>
                           <span className="text-sm text-slate-800">
                             {selectedUserProfile.user.created_at ? new Date(selectedUserProfile.user.created_at).toLocaleDateString() : 'N/A'}
                           </span>
                         </div>
                       </div>
-                      <div className="space-y-3">
-                        <div className="flex justify-between">
-                          <span className="text-sm font-medium text-slate-600">Questions Marked:</span>
-                          <span className="text-sm text-slate-800">{selectedUserProfile.user.questions_marked || 0}</span>
+                      <div className="space-y-3 bg-slate-50 p-4 rounded-lg border border-slate-200">
+                        <div className="flex justify-between items-center py-2 border-b border-slate-200">
+                          <span className="text-sm font-semibold text-slate-700">Questions Marked:</span>
+                          <span className="text-sm text-slate-800 font-bold bg-blue-100 px-2 py-1 rounded">{selectedUserProfile.user.questions_marked || 0}</span>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-sm font-medium text-slate-600">Credits:</span>
-                          <span className="text-sm text-slate-800">{selectedUserProfile.user.credits || 0}</span>
+                        <div className="flex justify-between items-center py-2 border-b border-slate-200">
+                          <span className="text-sm font-semibold text-slate-700">Credits:</span>
+                          <span className="text-sm text-slate-800 font-bold bg-green-100 px-2 py-1 rounded">{selectedUserProfile.user.credits || 0}</span>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-sm font-medium text-slate-600">Current Plan:</span>
-                          <span className="text-sm text-slate-800">{selectedUserProfile.user.current_plan || 'free'}</span>
+                        <div className="flex justify-between items-center py-2 border-b border-slate-200">
+                          <span className="text-sm font-semibold text-slate-700">Current Plan:</span>
+                          <span className="text-sm text-slate-800 capitalize font-medium bg-purple-100 px-2 py-1 rounded">{selectedUserProfile.user.current_plan || 'free'}</span>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-sm font-medium text-slate-600">Subscription Status:</span>
-                          <span className={`text-sm px-2 py-1 rounded-full ${
+                        <div className="flex justify-between items-center py-2 border-b border-slate-200">
+                          <span className="text-sm font-semibold text-slate-700">Subscription Status:</span>
+                          <span className={`text-sm px-3 py-1 rounded-full font-semibold ${
                             selectedUserProfile.user.subscription_status === 'active' ? 'bg-green-100 text-green-800' :
                             selectedUserProfile.user.subscription_status === 'cancelled' ? 'bg-red-100 text-red-800' :
                             'bg-slate-100 text-slate-800'
@@ -2195,9 +2396,11 @@ export function EnhancedMarketingDashboard() {
                             {selectedUserProfile.user.subscription_status || 'free'}
                           </span>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-sm font-medium text-slate-600">Launch User:</span>
-                          <span className="text-sm text-slate-800">{selectedUserProfile.user.is_launch_user ? 'Yes' : 'No'}</span>
+                        <div className="flex justify-between items-center py-2">
+                          <span className="text-sm font-semibold text-slate-700">Launch User:</span>
+                          <span className={`text-sm font-bold ${selectedUserProfile.user.is_launch_user ? 'text-orange-600' : 'text-slate-600'}`}>
+                            {selectedUserProfile.user.is_launch_user ? '⭐ Yes' : 'No'}
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -2206,10 +2409,13 @@ export function EnhancedMarketingDashboard() {
                   {/* Study Goals */}
                   {selectedUserProfile.goals.length > 0 && (
                     <div className="mt-6">
-                      <h4 className="font-semibold text-slate-700 mb-3">Study Goals ({selectedUserProfile.goals.length})</h4>
+                      <h4 className="text-lg font-bold text-slate-800 mb-4 flex items-center space-x-2">
+                        <Target className="w-5 h-5 text-green-500" />
+                        <span>Study Goals ({selectedUserProfile.goals.length})</span>
+                      </h4>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {selectedUserProfile.goals.slice(0, 4).map((goal, index) => (
-                          <GlassCard key={index} className="p-4">
+                          <GlassCard key={index} className="p-4 border-2 border-green-200 hover:border-green-400 transition-all hover:shadow-lg">
                             <div className="flex items-center justify-between mb-2">
                               <h5 className="font-medium text-slate-800">{goal.title || 'Untitled Goal'}</h5>
                               <span className="text-xs text-slate-500">
