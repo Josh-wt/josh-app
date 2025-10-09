@@ -225,7 +225,7 @@ export function EnhancedMarketingDashboard() {
           return acc
         }, {} as Record<string, { date: string; evaluations: number; unique_users: Set<string> }>)
         
-        const dailyTrendsArray = Object.values(dailyTrends || {}).map(trend => ({
+        const dailyTrendsArray = Object.values(dailyTrends || {}).map((trend: any) => ({
           date: trend.date,
           evaluations: trend.evaluations,
           unique_users: trend.unique_users.size
@@ -416,20 +416,7 @@ export function EnhancedMarketingDashboard() {
     }
   }
 
-  const fetchUserEvaluations = async (userId: string) => {
-    try {
-      setDatabaseLoading(true)
-      const response = await fetch(`/api/analytics/standard?table=assessment_evaluations&filter=user_id:${userId}&limit=50`)
-      if (response.ok) {
-        const data = await response.json()
-        setUserEvaluations(data.data || [])
-      }
-    } catch (err) {
-      console.error('Failed to fetch user evaluations:', err)
-    } finally {
-      setDatabaseLoading(false)
-    }
-  }
+
 
   const handleRefresh = () => {
     setRefreshing(true)
@@ -1884,10 +1871,10 @@ export function EnhancedMarketingDashboard() {
                           <div className="flex items-center justify-between">
                             <div>
                               <p className="font-medium text-slate-800">
-                                {result.type === 'user' ? result.full_name || result.email : `Evaluation: ${result.user_id}`}
+                                {result.type === 'user' ? result.data.full_name || result.data.email : `Evaluation: ${result.data.user_id}`}
                               </p>
                               <p className="text-xs text-slate-500">
-                                {result.type === 'user' ? result.email : `Score: ${result.score}`}
+                                {result.type === 'user' ? result.data.email : `Score: ${result.data.score}`}
                               </p>
                             </div>
                             <span className={`px-2 py-1 rounded-full text-xs ${
@@ -1903,7 +1890,7 @@ export function EnhancedMarketingDashboard() {
                 )}
 
                 {/* Advanced Filters Panel */}
-                {showAdvancedFilters && tableData.length > 0 && (
+                {showAdvancedFilters && tableData.data.length > 0 && (
                   <GlassCard className="p-4 mb-4">
                     <h4 className="font-medium text-slate-700 mb-4">Advanced Filters</h4>
                     
@@ -1933,7 +1920,7 @@ export function EnhancedMarketingDashboard() {
                         </div>
                         
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                          {Object.keys(tableData[0] || {}).map((column) => (
+                          {Object.keys(tableData.data[0] || {}).map((column) => (
                             <div key={column}>
                               <label className="block text-xs font-medium text-slate-600 mb-1">{column}</label>
                               <div className="flex space-x-1">
