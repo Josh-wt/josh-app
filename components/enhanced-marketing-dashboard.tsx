@@ -192,40 +192,53 @@ export function EnhancedMarketingDashboard() {
 
   const fetchComprehensiveMetrics = async () => {
     try {
-      console.log('🔍 [DEBUG] Starting fetchComprehensiveMetrics...')
-      
-      // Fetch evaluation metrics directly from Supabase
+      // --- Fetch all assessment evaluations (up to 10,000 for full analytics) ---
       const { data: evaluationsData, error: evaluationsError } = await everythingEnglishClient
         .from('assessment_evaluations')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(1000)
+        .limit(10000)
 
       if (evaluationsError) {
         console.error('❌ [ERROR] Error fetching evaluations:', evaluationsError)
+        setEvaluationMetrics(null)
       } else {
-        console.log('🔍 [DEBUG] Fetched evaluations:', evaluationsData?.length || 0)
-        
-        // Calculate evaluation metrics
-        const totalEvaluations = evaluationsData?.length || 0
-        const recentEvaluations = evaluationsData?.filter(e => {
-          const thirtyDaysAgo = new Date()
-          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-          return new Date(e.created_at) > thirtyDaysAgo
-        }).length || 0
-        
-        // Calculate daily trends
-        const dailyTrends = evaluationsData?.reduce((acc, evaluation) => {
-          const date = new Date(evaluation.created_at).toISOString().split('T')[0]
-          if (!acc[date]) {
-            acc[date] = { date, evaluations: 0, unique_users: new Set() }
+        // --- Calculate daily trends and unique users ---
+        const dailyTrends = {} as Record<string, { date: string; evaluations: number; unique_users: Set<string> }>
+        const userEvalCount = {} as Record<string, number>
+        const questionTypeCount = {} as Record<string, { count: number; unique_users: Set<string> }>
+        let returnUsers = 0
+        let totalEvaluations = 0
+        let uniqueUserSet = new Set<string>()
+
+        for (const e of evaluationsData || []) {
+          const date = new Date(e.created_at).toISOString().split('T')[0]
+          if (!dailyTrends[date]) dailyTrends[date] = { date, evaluations: 0, unique_users: new Set() }
+          dailyTrends[date].evaluations++
+          dailyTrends[date].unique_users.add(e.user_id)
+          uniqueUserSet.add(e.user_id)
+          userEvalCount[e.user_id] = (userEvalCount[e.user_id] || 0) + 1
+          // Question type breakdown
+          if (e.question_type) {
+            if (!questionTypeCount[e.question_type]) questionTypeCount[e.question_type] = { count: 0, unique_users: new Set() }
+            questionTypeCount[e.question_type].count++
+            questionTypeCount[e.question_type].unique_users.add(e.user_id)
           }
-          acc[date].evaluations++
-          acc[date].unique_users.add(evaluation.user_id)
-          return acc
-        }, {} as Record<string, { date: string; evaluations: number; unique_users: Set<string> }>)
-        
-        const dailyTrendsArray = Object.values(dailyTrends || {}).map(trend => ({
+        }
+        totalEvaluations = evaluationsData?.length || 0
+        // Return users: users with >1 evaluation
+        returnUsers = Object.values(userEvalCount).filter(c => c > 1).length
+        // Recent evaluations (last 30 days)
+        const thirtyDaysAgo = new Date(); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+        const recentEvaluations = (evaluationsData || []).filter(e => new Date(e.created_at) > thirtyDaysAgo).length
+        // Question type breakdown array
+        const questionTypes = Object.entries(questionTypeCount).map(([type, obj]) => ({
+          name: type,
+          count: obj.count,
+          unique_users: obj.unique_users.size
+        }))
+        // Daily trends array
+        const dailyTrendsArray = Object.values(dailyTrends).map(trend => ({
           date: trend.date,
           evaluations: trend.evaluations,
           unique_users: trend.unique_users.size
@@ -234,14 +247,15 @@ export function EnhancedMarketingDashboard() {
         setEvaluationMetrics({
           total_evaluations: totalEvaluations,
           recent_evaluations: recentEvaluations,
-          return_users: 0, // TODO: Calculate this
-          return_rate: 0, // TODO: Calculate this
-          avg_evaluations_per_user: totalEvaluations > 0 ? totalEvaluations / (new Set(evaluationsData?.map(e => e.user_id)).size) : 0,
-          daily_trends: dailyTrendsArray
+          return_users: returnUsers,
+          return_rate: uniqueUserSet.size > 0 ? Math.round((returnUsers / uniqueUserSet.size) * 100) : 0,
+          avg_evaluations_per_user: uniqueUserSet.size > 0 ? totalEvaluations / uniqueUserSet.size : 0,
+          daily_trends: dailyTrendsArray,
+          question_types: questionTypes
         })
       }
 
-      // Fetch user metrics directly from Supabase
+      // --- Fetch all assessment users ---
       const { data: usersData, error: usersError } = await everythingEnglishClient
         .from('assessment_users')
         .select('*')
@@ -249,27 +263,34 @@ export function EnhancedMarketingDashboard() {
 
       if (usersError) {
         console.error('❌ [ERROR] Error fetching users:', usersError)
+        setUserMetrics(null)
       } else {
-        console.log('🔍 [DEBUG] Fetched users:', usersData?.length || 0)
-        
+        // Calculate new users (last 30 days)
+        const now = new Date()
+        const newUsers30d = (usersData || []).filter(u => new Date(u.created_at) > new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)).length
         setUserMetrics({
           total_users: usersData?.length || 0,
-          active_users: 0, // TODO: Calculate this
-          new_users: 0 // TODO: Calculate this
+          new_users_30d: newUsers30d
         })
       }
 
-      // Set placeholder data for engagement and performance metrics
+      // --- Placeholder engagement and performance metrics (expand as needed) ---
       setEngagementMetrics({
-        engagement_score: 0,
-        active_sessions: 0
+        study_streaks: 0,
+        max_streak: 0,
+        saved_resources: 0,
+        users_with_saved_resources: 0,
+        total_goals: 0,
+        completed_goals: 0,
+        goal_completion_rate: 0
       })
-
       setPerformanceMetrics({
         feedback_quality: 0,
-        response_time: 0
+        total_feedback: 0,
+        conversion_rate: 0,
+        active_subscriptions: 0,
+        retention_rate: 0
       })
-
     } catch (err) {
       console.error('❌ [ERROR] Failed to fetch comprehensive metrics:', err)
     }
@@ -1714,10 +1735,14 @@ export function EnhancedMarketingDashboard() {
                           <div className="flex items-center justify-between">
                             <div>
                               <p className="font-medium text-slate-800">
-                                {result.type === 'user' ? result.full_name || result.email : `Evaluation: ${result.user_id}`}
+                                {result.type === 'user'
+                                  ? result.data.full_name || result.data.email || result.id
+                                  : `Evaluation: ${result.data.user_id || result.id}`}
                               </p>
                               <p className="text-xs text-slate-500">
-                                {result.type === 'user' ? result.email : `Score: ${result.score}`}
+                                {result.type === 'user'
+                                  ? result.data.email || result.id
+                                  : `Score: ${result.data.score ?? 'N/A'}`}
                               </p>
                             </div>
                             <span className={`px-2 py-1 rounded-full text-xs ${
@@ -1733,7 +1758,7 @@ export function EnhancedMarketingDashboard() {
                 )}
 
                 {/* Advanced Filters Panel */}
-                {showAdvancedFilters && tableData.length > 0 && (
+                {showAdvancedFilters && tableData.data && tableData.data.length > 0 && (
                   <GlassCard className="p-4 mb-4">
                     <h4 className="font-medium text-slate-700 mb-4">Advanced Filters</h4>
                     
@@ -1763,7 +1788,7 @@ export function EnhancedMarketingDashboard() {
                         </div>
                         
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                          {Object.keys(tableData[0] || {}).map((column) => (
+                          {Object.keys(tableData.data[0] || {}).map((column) => (
                             <div key={column}>
                               <label className="block text-xs font-medium text-slate-600 mb-1">{column}</label>
                               <div className="flex space-x-1">
